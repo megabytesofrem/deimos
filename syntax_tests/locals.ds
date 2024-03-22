@@ -1,0 +1,9 @@
+local type_inferred = 1
+local provided_type:int = 1
+local provided_type2:string = 1
+
+-- local function is not supported, but may be in the future
+function global_function()
+    local local_var = 1
+    return local_var
+end

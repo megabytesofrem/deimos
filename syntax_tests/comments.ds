@@ -1,0 +1,4 @@
+-- This is a single-line comment
+-- This is another single-line comment
+
+local foo = 1 -- this is a end of line comment
