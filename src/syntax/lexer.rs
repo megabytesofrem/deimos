@@ -111,6 +111,29 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    And,
+    Or,
+    Equal,
+    BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnOp {
+    Neg,
+    Bang,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub location: SourceLoc,
