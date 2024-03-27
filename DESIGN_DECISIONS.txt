@@ -1,0 +1,20 @@
+Type system
+----------------
+- Variables are statically typed and checked at compile-time and specified like `local x:int = 1`.
+- The valid types are: `int,float,string,bool,void` as well as arrays and pointer (`[]int` and `*int`)
+
+Function scoping
+-----------------
+- Functions are scoped globally unlike in Lua so there is no such thing as a "local function".
+
+C interoperability
+-------------------
+- Ints and floats map to C `int32_t` and `float` type
+- Pointer types map to C pointer types
+- Most of the standard library will be written in C and just have thin wrappers
+- C headers can be imported using `cimport` statement eg `cimport cstdio`
+
+Package Management?
+--------------------
+A future preposition is a package manager (no idea on a name), which will allow you to easily
+install/uninstall packages for the Deimos language.

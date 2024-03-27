@@ -8,6 +8,7 @@ pub enum Ty {
     Bool,
     String,
     Void,
+    Any,
 
     // Compound types
     Function(Box<Ty>, Vec<Ty>), // return type, argument types
@@ -54,13 +55,13 @@ pub enum Stmt {
         fields: Vec<(String, Ty)>,
     },
     Assign {
-        lhs: Expr,
-        rhs: Expr,
+        target: Expr,
+        value: Expr,
     },
     If {
         cond: Expr,
-        then_block: Vec<Stmt>,
-        else_block: Option<Vec<Stmt>>,
+        then_block: Block,
+        else_block: Option<Block>,
     },
     For {
         init: String,
@@ -70,7 +71,7 @@ pub enum Stmt {
     },
     While {
         cond: Expr,
-        block: Vec<Stmt>,
+        block: Block,
     },
 }
 
@@ -80,6 +81,12 @@ pub type Program = Vec<ToplevelStmt>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
     Stmt(Stmt),
+    CImport(String), // cimport stdio
+
+    Import {
+        path: Vec<String>,
+        alias: Option<String>,
+    },
 
     FunctionDecl {
         name: String,

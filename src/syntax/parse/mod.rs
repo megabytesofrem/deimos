@@ -1,4 +1,6 @@
-pub mod parse_expr;
+// Sub-parsers
+pub mod expr;
+pub mod import_stmt;
 
 use super::ast::{Block, Expr, ToplevelStmt};
 use super::lexer::*;
@@ -10,6 +12,7 @@ type ParameterPair = (String, Ty);
 
 pub struct Parser<'a> {
     tokens: LexerIter<'a>,
+    errors: Vec<SyntaxError>,
     pos: usize,
 }
 
@@ -56,7 +59,11 @@ impl TokenKind {
 impl<'a> Parser<'a> {
     pub fn new(src: &'a str) -> Self {
         let tokens = lex_tokens(src);
-        Parser { tokens, pos: 0 }
+        Parser {
+            tokens,
+            errors: Vec::new(),
+            pos: 0,
+        }
     }
 
     /// Peek at the next token
@@ -190,6 +197,20 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
+    fn parse_toplevel_stmt(&mut self) -> ParseResult<ToplevelStmt> {
+        match self.peek() {
+            Some(token) => match token.kind {
+                TokenKind::KwImport => self.parse_import(),
+                TokenKind::KwFunction => self.parse_function_declare(),
+                _ => {
+                    let stmt = self.parse_stmt()?;
+                    Ok(ToplevelStmt::Stmt(stmt))
+                }
+            },
+            None => Err(SyntaxError::UnexpectedEof),
+        }
+    }
+
     fn parse_stmt(&mut self) -> ParseResult<Stmt> {
         match self.peek() {
             Some(token) => match token.kind {
@@ -235,8 +256,8 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
         Ok(Stmt::Assign {
-            lhs: Expr::Variable(ident.literal.to_string()),
-            rhs: expr,
+            target: Expr::Variable(ident.literal.to_string()),
+            value: expr,
         })
     }
 
@@ -425,7 +446,7 @@ mod parser_tests {
     #[test]
     fn test_parser() {
         // Windows uses CRLF which sucks and breaks everything
-        let src = std::fs::read_to_string("syntax_tests/first.ds").expect("Failed to read file");
+        let src = std::fs::read_to_string("syntax_tests/parse01.ds").expect("Failed to read file");
 
         println!("{}", src);
 

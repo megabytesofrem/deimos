@@ -15,6 +15,9 @@ pub enum SyntaxError {
     #[error("Expected an expression")]
     ExpectedExpr { location: SourceLoc },
 
+    #[error("Expected an identifier")]
+    ExpectedIdent { location: SourceLoc },
+
     #[error("Expected a statement")]
     ExpectedStmt { location: SourceLoc },
 
@@ -27,6 +30,9 @@ pub enum SyntaxError {
         found: TokenKind,
         location: SourceLoc,
     },
+
+    #[error("Invalid character in path")]
+    InvalidPathChar { location: SourceLoc },
 
     #[error("Cannot index into non-array type {ty:?}")]
     CannotIndexIntoNonArray { ty: String },

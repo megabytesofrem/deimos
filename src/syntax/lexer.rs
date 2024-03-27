@@ -55,8 +55,8 @@ pub enum TokenKind {
     Float,
     #[token("bool")]
     Bool,
-    #[token("str")]
-    Str,
+    #[token("string")]
+    String,
     #[token("void")]
     Void,
 
@@ -67,8 +67,12 @@ pub enum TokenKind {
     KwStruct,
     #[token("function")]
     KwFunction,
+    #[token("cimport")]
+    KwCImport,
     #[token("import")]
     KwImport,
+    #[token("as")]
+    KwAs,
     #[token("if")]
     KwIf,
     #[token("then")]
@@ -100,7 +104,7 @@ pub enum TokenKind {
     #[regex(r"0[xX][0-9a-fA-F]+")]
     HexInteger,
     #[regex(r#""(\\[\\"]|[^"])*""#)]
-    String,
+    StringLit,
 
     #[regex(r"--.*\n?")]
     Comment,
@@ -119,12 +123,12 @@ pub enum BinOp {
     Mod,
     And,
     Or,
-    Equal,
-    BangEqual,
+    Eq,
+    BangEq,
     Less,
-    LessEqual,
+    LessEq,
     Greater,
-    GreaterEqual,
+    GreaterEq,
 }
 
 #[derive(Debug, Clone, PartialEq)]

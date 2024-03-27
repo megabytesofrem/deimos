@@ -1,7 +1,7 @@
-use super::{ParseResult, Parser, TokenKind};
+use super::{ParseResult, Parser};
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
-use crate::syntax::lexer::{BinOp, UnOp};
+use crate::syntax::lexer::{BinOp, TokenKind, UnOp};
 
 fn strip_quotes(s: &str) -> &str {
     &s[1..s.len() - 1]
@@ -13,12 +13,12 @@ fn tokenkind_to_binop(kind: &TokenKind) -> BinOp {
         TokenKind::Minus => BinOp::Sub,
         TokenKind::Star => BinOp::Mul,
         TokenKind::Slash => BinOp::Div,
-        TokenKind::Equal => BinOp::Equal,
-        TokenKind::BangEqual => BinOp::BangEqual,
+        TokenKind::Equal => BinOp::Eq,
+        TokenKind::BangEqual => BinOp::BangEq,
         TokenKind::Less => BinOp::Less,
-        TokenKind::LessEqual => BinOp::LessEqual,
+        TokenKind::LessEqual => BinOp::LessEq,
         TokenKind::Greater => BinOp::Greater,
-        TokenKind::GreaterEqual => BinOp::GreaterEqual,
+        TokenKind::GreaterEqual => BinOp::GreaterEq,
         _ => panic!("Not a binary operator: {:?}", kind),
     }
 }
@@ -90,7 +90,7 @@ impl<'a> Parser<'a> {
         let expected_tokens = [
             TokenKind::Int,
             TokenKind::Float,
-            TokenKind::String,
+            TokenKind::StringLit,
             TokenKind::Ident,
             TokenKind::LSquare, // for array literals
             TokenKind::LCurly,  // for struct initializers
@@ -124,7 +124,7 @@ impl<'a> Parser<'a> {
             // Primitives
             TokenKind::Integer => Ok(Expr::Int(token.to_int_literal())),
             TokenKind::Float => Ok(Expr::Float(token.literal.parse().unwrap())),
-            TokenKind::String => Ok(Expr::String(strip_quotes(token.literal).to_string())),
+            TokenKind::StringLit => Ok(Expr::String(strip_quotes(token.literal).to_string())),
             TokenKind::KwTrue => Ok(Expr::Bool(true)),
             TokenKind::KwFalse => Ok(Expr::Bool(false)),
             TokenKind::Ident => self.parse_starting_ident(token.literal.to_string()),
