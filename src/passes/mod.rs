@@ -1,2 +1,5 @@
 pub mod context;
-pub mod hir;
+
+// Lower to typed HIR
+pub mod thir;
+pub mod thir_lower;

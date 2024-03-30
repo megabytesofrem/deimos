@@ -1,4 +1,7 @@
-use super::lexer::{BinOp, SourceLoc, UnOp};
+use super::{
+    lexer::{BinOp, SourceLoc, UnOp},
+    span::*,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
@@ -9,6 +12,7 @@ pub enum Ty {
     String,
     Void,
     Any,
+    Unknown,
 
     // Compound types
     Function(Box<Ty>, Vec<Ty>), // return type, argument types
@@ -20,76 +24,83 @@ pub enum Ty {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    // Primitive types
+pub enum Literal {
     Int(i64),
     Float(f32),
     Double(f64),
     Bool(bool),
     String(String),
-    Variable(String),
-
-    Array(Vec<Expr>),
-    Tuple(Vec<Expr>),
-
-    // Struct constructor
-    StructCons { fields: Vec<(String, Expr)> },
-
-    // Operations
-    BinOp(Box<Expr>, BinOp, Box<Expr>),
-    UnOp(UnOp, Box<Expr>),
-    ArrayIndex { array: Box<Expr>, index: Box<Expr> },
-    Call { func: Box<Expr>, args: Vec<Expr> },
 }
 
-/// Expression with the source location attached to it
 #[derive(Debug, Clone, PartialEq)]
-pub struct SpannedExpr {
-    pub raw: Expr,
-    pub location: SourceLoc,
+pub enum Expr {
+    // Primitive types
+    Literal(Literal),
+    Variable(String),
+
+    // Operations
+    BinOp(Box<Spanned<Expr>>, BinOp, Box<Spanned<Expr>>),
+    UnOp(UnOp, Box<Spanned<Expr>>),
+
+    Array(Vec<Spanned<Expr>>),
+    Tuple(Vec<Spanned<Expr>>),
+
+    StructCons {
+        fields: Vec<(String, Spanned<Expr>)>,
+    },
+    ArrayIndex {
+        array: Box<Spanned<Expr>>,
+        index: Box<Spanned<Expr>>,
+    },
+    Call {
+        func: Box<Spanned<Expr>>,
+        args: Vec<Spanned<Expr>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
-    Expr(Expr),
-    Return(Option<Expr>),
+    Expr(Spanned<Expr>),
+    Return(Option<Spanned<Expr>>),
 
     Local {
         name: String,
         ty: Option<Ty>,
-        value: Option<SpannedExpr>,
+        value: Option<Spanned<Expr>>,
     },
+
+    // TODO: Should this be moved to toplevel?
     StructDecl {
         name: String,
         fields: Vec<(String, Ty)>,
     },
     Assign {
         target: Expr,
-        value: SpannedExpr,
+        value: Spanned<Expr>,
     },
     If {
-        cond: SpannedExpr,
+        cond: Spanned<Expr>,
         then_block: Block,
         else_block: Option<Block>,
     },
     For {
         init: String,
-        from: SpannedExpr,
-        to: SpannedExpr,
+        from: Spanned<Expr>,
+        to: Spanned<Expr>,
         body: Block,
     },
     While {
-        cond: Expr,
+        cond: Spanned<Expr>,
         block: Block,
     },
 }
 
-pub type Block = Vec<Stmt>;
-pub type Program = Vec<ToplevelStmt>;
+pub type Block = Vec<Spanned<Stmt>>;
+pub type Program = Vec<Spanned<ToplevelStmt>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
-    Stmt(Stmt),
+    Stmt(Spanned<Stmt>),
     CImport(String), // cimport stdio
 
     Import {

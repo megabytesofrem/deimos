@@ -2,8 +2,11 @@
 pub mod expr;
 pub mod import_stmt;
 
+use crate::spanned;
+
 use super::ast::{Block, Expr, ToplevelStmt};
 use super::lexer::*;
+use super::span::Spanned;
 use super::{ast::Stmt, ast::Ty, errors::SyntaxError};
 
 /// Result type for parsing
@@ -211,7 +214,8 @@ impl<'cx> Parser<'cx> {
         }
     }
 
-    fn parse_stmt(&mut self) -> ParseResult<Stmt> {
+    // FIXME: change this back to private
+    pub fn parse_stmt(&mut self) -> ParseResult<Spanned<Stmt>> {
         match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwLocal => self.parse_local_declare(),
@@ -222,47 +226,52 @@ impl<'cx> Parser<'cx> {
                 TokenKind::KwWhile => self.parse_while_loop(),
                 TokenKind::KwReturn => self.parse_return(),
                 // Unexpected token
-                _ => unimplemented!(),
                 // Commented until I add support for comments
-                // _ => Err(SyntaxError::UnexpectedToken {
-                //     token: token.kind.clone(),
-                //     location: token.location.clone(),
-                // }),
+                _ => Err(SyntaxError::UnexpectedToken {
+                    token: token.kind.clone(),
+                    location: token.location.clone(),
+                }),
             },
             None => Err(SyntaxError::UnexpectedEof),
         }
     }
 
     // Statements
-    fn parse_local_declare(&mut self) -> ParseResult<Stmt> {
+    fn parse_local_declare(&mut self) -> ParseResult<Spanned<Stmt>> {
         // local ident:type = expr
-        self.expect(TokenKind::KwLocal)?;
+        let t = self.expect(TokenKind::KwLocal)?;
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Colon)?;
         let ty = self.parse_type()?;
 
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
-        Ok(Stmt::Local {
-            name: ident.literal.to_string(),
-            ty: Some(ty),
-            value: Some(expr),
-        })
+        Ok(spanned!(
+            Stmt::Local {
+                name: ident.literal.to_string(),
+                ty: Some(ty),
+                value: Some(expr),
+            },
+            t.location
+        ))
     }
 
-    fn parse_assignment(&mut self) -> ParseResult<Stmt> {
+    fn parse_assignment(&mut self) -> ParseResult<Spanned<Stmt>> {
         // ident = expr
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
-        Ok(Stmt::Assign {
-            target: Expr::Variable(ident.literal.to_string()),
-            value: expr,
-        })
+        Ok(spanned!(
+            Stmt::Assign {
+                target: Expr::Variable(ident.literal.to_string()),
+                value: expr,
+            },
+            ident.location
+        ))
     }
 
-    fn parse_if_stmt(&mut self) -> ParseResult<Stmt> {
-        self.expect(TokenKind::KwIf)?;
+    fn parse_if_stmt(&mut self) -> ParseResult<Spanned<Stmt>> {
+        let t = self.expect(TokenKind::KwIf)?;
         let condition = self.parse_expr()?;
 
         self.expect(TokenKind::KwThen)?;
@@ -279,19 +288,22 @@ impl<'cx> Parser<'cx> {
             None
         };
 
-        Ok(Stmt::If {
-            cond: condition,
-            then_block,
-            else_block,
-        })
+        Ok(spanned!(
+            Stmt::If {
+                cond: condition,
+                then_block,
+                else_block,
+            },
+            t.location
+        ))
     }
 
-    fn parse_for_loop(&mut self) -> ParseResult<Stmt> {
+    fn parse_for_loop(&mut self) -> ParseResult<Spanned<Stmt>> {
         // for counter = start, end do
         // .. body
         // end
 
-        self.expect(TokenKind::KwFor)?;
+        let t = self.expect(TokenKind::KwFor)?;
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Equal)?;
         let start = self.parse_expr()?;
@@ -301,32 +313,32 @@ impl<'cx> Parser<'cx> {
         self.expect(TokenKind::KwDo)?;
         let body = self.parse_block()?;
 
-        Ok(Stmt::For {
-            init: ident.literal.to_string(),
-            from: start,
-            to: end,
-            body,
-        })
+        Ok(spanned!(
+            Stmt::For {
+                init: ident.literal.to_string(),
+                from: start,
+                to: end,
+                body,
+            },
+            t.location
+        ))
     }
 
-    fn parse_while_loop(&mut self) -> ParseResult<Stmt> {
+    fn parse_while_loop(&mut self) -> ParseResult<Spanned<Stmt>> {
         // while condition do
         // .. body
         // end
 
-        self.expect(TokenKind::KwWhile)?;
+        let t = self.expect(TokenKind::KwWhile)?;
         let cond = self.parse_expr()?;
         self.expect(TokenKind::KwDo)?;
         let block = self.parse_block()?;
-        Ok(Stmt::While {
-            cond: cond.raw,
-            block,
-        })
+        Ok(spanned!(Stmt::While { cond, block }, t.location))
     }
 
-    fn parse_return(&mut self) -> ParseResult<Stmt> {
+    fn parse_return(&mut self) -> ParseResult<Spanned<Stmt>> {
         // return expr?
-        self.expect(TokenKind::KwReturn)?;
+        let t = self.expect(TokenKind::KwReturn)?;
         let expr = if let Some(token) = self.peek() {
             if token.kind == TokenKind::KwEnd {
                 None
@@ -335,16 +347,15 @@ impl<'cx> Parser<'cx> {
             }
         } else {
             None
-        }
-        .map(|e| e.raw);
+        };
 
-        Ok(Stmt::Return(expr))
+        Ok(spanned!(Stmt::Return(expr), t.location))
     }
 
     // NOTE: Maybe come up with a better syntax for this?
-    fn parse_struct_declare(&mut self) -> ParseResult<Stmt> {
+    fn parse_struct_declare(&mut self) -> ParseResult<Spanned<Stmt>> {
         // struct name = { field* }
-        self.expect(TokenKind::KwStruct)?;
+        let t = self.expect(TokenKind::KwStruct)?;
         let name = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Equal)?;
 
@@ -366,10 +377,13 @@ impl<'cx> Parser<'cx> {
         }
 
         self.expect(TokenKind::RCurly)?;
-        Ok(Stmt::StructDecl {
-            name: name.literal.to_string(),
-            fields,
-        })
+        Ok(spanned!(
+            Stmt::StructDecl {
+                name: name.literal.to_string(),
+                fields,
+            },
+            t.location
+        ))
     }
 
     fn parse_function_declare(&mut self) -> ParseResult<ToplevelStmt> {
@@ -404,7 +418,8 @@ impl<'cx> Parser<'cx> {
         })
     }
 
-    fn parse_block(&mut self) -> ParseResult<Block> {
+    // FIXME: change this back to private
+    pub fn parse_block(&mut self) -> ParseResult<Block> {
         let mut stmts = Vec::new();
 
         while let Some(token) = self.peek() {
@@ -418,7 +433,7 @@ impl<'cx> Parser<'cx> {
         Ok(stmts)
     }
 
-    pub fn parse(src: &'cx str) -> ParseResult<'cx, Vec<ToplevelStmt>> {
+    pub fn parse(src: &'cx str) -> ParseResult<'cx, Vec<Spanned<ToplevelStmt>>> {
         // node: (function_declare | stmt)
         // nodes: node*
         let mut parser = Parser::new(src);
@@ -431,10 +446,12 @@ impl<'cx> Parser<'cx> {
                     parser.advance();
                 }
                 TokenKind::KwFunction => {
-                    nodes.push(parser.parse_function_declare()?);
+                    let location = token.location.clone();
+                    nodes.push(spanned!(parser.parse_function_declare()?, location));
                 }
                 _ => {
-                    nodes.push(ToplevelStmt::Stmt(parser.parse_stmt()?));
+                    let location = token.location.clone();
+                    nodes.push(spanned!(ToplevelStmt::Stmt(parser.parse_stmt()?), location));
                 }
             }
         }
