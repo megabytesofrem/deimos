@@ -7,11 +7,11 @@ use super::lexer::*;
 use super::{ast::Stmt, ast::Ty, errors::SyntaxError};
 
 /// Result type for parsing
-type ParseResult<'a, T> = Result<T, SyntaxError>;
+type ParseResult<'cx, T> = Result<T, SyntaxError>;
 type ParameterPair = (String, Ty);
 
-pub struct Parser<'a> {
-    tokens: LexerIter<'a>,
+pub struct Parser<'cx> {
+    tokens: LexerIter<'cx>,
     errors: Vec<SyntaxError>,
     pos: usize,
 }
@@ -56,8 +56,8 @@ impl TokenKind {
     }
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(src: &'a str) -> Self {
+impl<'cx> Parser<'cx> {
+    pub fn new(src: &'cx str) -> Self {
         let tokens = lex_tokens(src);
         Parser {
             tokens,
@@ -72,7 +72,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Advance the parser by one token
-    pub fn advance(&mut self) -> Option<Token<'a>> {
+    pub fn advance(&mut self) -> Option<Token<'cx>> {
         self.pos += 1;
         let token = self.tokens.next();
         token
@@ -87,7 +87,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Consume the next token and return it if it matches the expected kind
-    pub fn expect(&mut self, kind: TokenKind) -> ParseResult<Token<'a>> {
+    pub fn expect(&mut self, kind: TokenKind) -> ParseResult<Token<'cx>> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         if token.kind == kind {
             Ok(token)
@@ -100,7 +100,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Remap the error from `expect` to a custom error passed in
-    pub fn expect_error(&mut self, kind: TokenKind, err: SyntaxError) -> ParseResult<Token<'a>> {
+    pub fn expect_error(&mut self, kind: TokenKind, err: SyntaxError) -> ParseResult<Token<'cx>> {
         self.expect(kind).map_err(|_| err)
     }
 
@@ -318,7 +318,10 @@ impl<'a> Parser<'a> {
         let cond = self.parse_expr()?;
         self.expect(TokenKind::KwDo)?;
         let block = self.parse_block()?;
-        Ok(Stmt::While { cond, block })
+        Ok(Stmt::While {
+            cond: cond.raw,
+            block,
+        })
     }
 
     fn parse_return(&mut self) -> ParseResult<Stmt> {
@@ -332,7 +335,8 @@ impl<'a> Parser<'a> {
             }
         } else {
             None
-        };
+        }
+        .map(|e| e.raw);
 
         Ok(Stmt::Return(expr))
     }
@@ -414,22 +418,23 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    pub fn parse(&mut self) -> ParseResult<Vec<ToplevelStmt>> {
+    pub fn parse(src: &'cx str) -> ParseResult<'cx, Vec<ToplevelStmt>> {
         // node: (function_declare | stmt)
         // nodes: node*
+        let mut parser = Parser::new(src);
         let mut nodes = Vec::new();
 
-        while let Some(token) = self.peek() {
+        while let Some(token) = parser.peek() {
             match token.kind {
                 // TODO: Skip comments while still storing them in the AST
                 TokenKind::Comment => {
-                    self.advance();
+                    parser.advance();
                 }
                 TokenKind::KwFunction => {
-                    nodes.push(self.parse_function_declare()?);
+                    nodes.push(parser.parse_function_declare()?);
                 }
                 _ => {
-                    nodes.push(ToplevelStmt::Stmt(self.parse_stmt()?));
+                    nodes.push(ToplevelStmt::Stmt(parser.parse_stmt()?));
                 }
             }
         }
@@ -450,8 +455,7 @@ mod parser_tests {
 
         println!("{}", src);
 
-        let mut parser = Parser::new(src.as_str());
-        let nodes = parser.parse().unwrap();
+        let nodes = Parser::parse(src.as_str()).unwrap();
 
         println!("{:#?}", nodes);
 

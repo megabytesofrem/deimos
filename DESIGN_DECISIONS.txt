@@ -1,3 +1,9 @@
+AST transformations
+--------------------
+1. AST created from the parsed input
+2. AST is annotated with types and a HIR is created
+3. Control flow analysis
+
 Type system
 ----------------
 - Variables are statically typed and checked at compile-time and specified like `local x:int = 1`.
@@ -12,9 +18,8 @@ C interoperability
 - Ints and floats map to C `int32_t` and `float` type
 - Pointer types map to C pointer types
 - Most of the standard library will be written in C and just have thin wrappers
-- C headers can be imported using `cimport` statement eg `cimport cstdio`
 
-Package Management?
---------------------
-A future preposition is a package manager (no idea on a name), which will allow you to easily
-install/uninstall packages for the Deimos language.
+Import Resolution
+----------------------
+- Each file is its own module implicitly named the name of the file e.g `foo.ds` is module `foo`.
+- A module can specify a list of imports which it can use

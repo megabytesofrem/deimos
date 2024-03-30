@@ -1,4 +1,4 @@
-use super::{ParseResult, Parser};
+use super::{ParseResult, Parser, SourceLoc};
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{BinOp, TokenKind, UnOp};
@@ -32,7 +32,15 @@ fn tokenkind_to_unop(kind: &TokenKind) -> UnOp {
 }
 
 impl<'a> Parser<'a> {
-    fn parse_expr_prec(&mut self, min_prec: u8) -> ParseResult<Expr> {
+    fn spanned(&mut self, expr: Expr, location: SourceLoc) -> SpannedExpr {
+        SpannedExpr {
+            raw: expr,
+            location,
+        }
+    }
+
+    fn parse_expr_prec(&mut self, min_prec: u8) -> ParseResult<SpannedExpr> {
+        let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
         let mut lhs = self.parse_value()?;
 
         while let Some(op) = self.peek() {
@@ -53,10 +61,20 @@ impl<'a> Parser<'a> {
             // Parse the right-hand side of the expression
             if op.is_op() {
                 let rhs = self.parse_expr_prec(op.get_precedence() + 1)?;
-                lhs = Expr::BinOp(Box::new(lhs), tokenkind_to_binop(&op), Box::new(rhs));
+                lhs = self.spanned(
+                    Expr::BinOp(
+                        Box::new(lhs.raw),
+                        tokenkind_to_binop(&op),
+                        Box::new(rhs.raw),
+                    ),
+                    location.clone(),
+                );
             } else if op.is_unop() {
                 let rhs = self.parse_expr_prec(op.get_precedence())?;
-                lhs = Expr::UnOp(tokenkind_to_unop(&op), Box::new(rhs));
+                lhs = self.spanned(
+                    Expr::UnOp(tokenkind_to_unop(&op), Box::new(rhs.raw)),
+                    location.clone(),
+                );
             } else {
                 break;
             }
@@ -65,11 +83,13 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
-    pub fn parse_expr(&mut self) -> ParseResult<Expr> {
+    pub fn parse_expr(&mut self) -> ParseResult<SpannedExpr> {
         self.parse_expr_prec(0)
     }
 
-    fn parse_starting_ident(&mut self, name: String) -> ParseResult<Expr> {
+    fn parse_starting_ident(&mut self, name: String) -> ParseResult<SpannedExpr> {
+        let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
+
         if let Some(TokenKind::LParen) = self.peek().map(|t| &t.kind) {
             // Function call
             todo!();
@@ -78,14 +98,14 @@ impl<'a> Parser<'a> {
         if let Some(TokenKind::LSquare) = self.peek().map(|t| &t.kind) {
             // Array indexer
             let expr = self.parse_expr()?;
-            return self.parse_array_indexer(expr);
+            return self.parse_array_indexer(expr.raw);
         }
 
         // Just an identifier
-        Ok(Expr::Variable(name))
+        Ok(self.spanned(Expr::Variable(name), location))
     }
 
-    pub fn parse_value(&mut self) -> ParseResult<Expr> {
+    pub fn parse_value(&mut self) -> ParseResult<SpannedExpr> {
         // Hardcoded list of expected tokens for error messages
         let expected_tokens = [
             TokenKind::Int,
@@ -97,15 +117,18 @@ impl<'a> Parser<'a> {
         ];
 
         // Get the span location of the token
-        let loc = self.peek().map(|t| t.clone().location).unwrap_or_default();
+        let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
         let token = self.advance().ok_or(SyntaxError::ExpectedExpr {
-            location: loc.clone(),
+            location: location.clone(),
         })?;
 
         match &token.kind {
             TokenKind::Minus | TokenKind::Bang => {
                 let expr = self.parse_expr()?;
-                Ok(Expr::UnOp(tokenkind_to_unop(&token.kind), Box::new(expr)))
+                Ok(self.spanned(
+                    Expr::UnOp(tokenkind_to_unop(&token.kind), Box::new(expr.raw)),
+                    location,
+                ))
             }
 
             // Sub-expressions
@@ -113,7 +136,7 @@ impl<'a> Parser<'a> {
                 let expr = self.parse_expr()?;
                 self.expect_error(
                     TokenKind::RParen,
-                    SyntaxError::UnmatchedBrackets { location: loc },
+                    SyntaxError::UnmatchedBrackets { location },
                 )?;
                 Ok(expr)
             }
@@ -122,48 +145,61 @@ impl<'a> Parser<'a> {
             TokenKind::LCurly => self.parse_struct_cons(),
 
             // Primitives
-            TokenKind::Integer => Ok(Expr::Int(token.to_int_literal())),
-            TokenKind::Float => Ok(Expr::Float(token.literal.parse().unwrap())),
-            TokenKind::StringLit => Ok(Expr::String(strip_quotes(token.literal).to_string())),
-            TokenKind::KwTrue => Ok(Expr::Bool(true)),
-            TokenKind::KwFalse => Ok(Expr::Bool(false)),
+            TokenKind::Integer => Ok(self.spanned(Expr::Int(token.to_int_literal()), location)),
+            TokenKind::Float => {
+                Ok(self.spanned(Expr::Float(token.literal.parse().unwrap()), location))
+            }
+            TokenKind::StringLit => Ok(self.spanned(
+                Expr::String(strip_quotes(token.literal).to_string()),
+                location,
+            )),
+            TokenKind::KwTrue => Ok(self.spanned(Expr::Bool(true), location)),
+            TokenKind::KwFalse => Ok(self.spanned(Expr::Bool(false), location)),
             TokenKind::Ident => self.parse_starting_ident(token.literal.to_string()),
             // Unexpected token, expected one of the above
             err_token => Err(SyntaxError::ExpectedOneOf {
                 expected: expected_tokens.to_vec(),
                 found: err_token.clone(),
-                location: loc,
+                location,
             }),
         }
     }
 
-    fn parse_array_indexer(&mut self, array: Expr) -> ParseResult<Expr> {
-        let mut loc = self.peek().map(|t| t.clone().location).unwrap_or_default();
+    fn parse_array_indexer(&mut self, array: Expr) -> ParseResult<SpannedExpr> {
+        let mut location = self.peek().map(|t| t.clone().location).unwrap_or_default();
         let arr = self.parse_expr()?;
 
         // Check that arr is an array
-        match arr {
+        match arr.raw {
             Expr::Array(_) => (),
-            _ => return Err(SyntaxError::ExpectedArray { location: loc }),
+            _ => return Err(SyntaxError::ExpectedArray { location }),
         }
 
         self.expect(TokenKind::LSquare)?;
         let index = self.parse_expr()?;
-        loc = self.peek().map(|t| t.location.clone()).unwrap_or_default();
+        location = self.peek().map(|t| t.location.clone()).unwrap_or_default();
 
         // Check for unmatched brackets
         self.expect_error(
             TokenKind::RSquare,
-            SyntaxError::UnmatchedBrackets { location: loc },
+            SyntaxError::UnmatchedBrackets {
+                location: location.clone(),
+            },
         )?;
 
-        Ok(Expr::ArrayIndex {
-            array: Box::new(array),
-            index: Box::new(index),
-        })
+        Ok(self.spanned(
+            Expr::ArrayIndex {
+                array: Box::new(array),
+                index: Box::new(index.raw),
+            },
+            location,
+        ))
     }
 
-    fn parse_array_literal(&mut self) -> ParseResult<Expr> {
+    fn parse_array_literal(&mut self) -> ParseResult<SpannedExpr> {
+        // Array syntax: [value1, value2, ...]
+        let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
+
         self.expect(TokenKind::LSquare)?;
         let mut elements = Vec::new();
 
@@ -189,10 +225,53 @@ impl<'a> Parser<'a> {
             SyntaxError::UnmatchedBrackets { location: loc },
         )?;
 
-        Ok(Expr::Array(elements))
+        Ok(self.spanned(
+            Expr::Array(elements.iter().map(|e| e.raw.clone()).collect()),
+            location,
+        ))
     }
 
-    fn parse_struct_cons(&mut self) -> ParseResult<Expr> {
+    fn parse_tuple_literal(&mut self) -> ParseResult<SpannedExpr> {
+        // Tuple syntax: (value1, value2, ...)
+        // Tuples are represented in the backend as anonymous structs and can be returned from functions
+
+        let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
+
+        self.expect(TokenKind::LParen)?;
+        let mut elements = Vec::new();
+
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::RParen {
+                break;
+            }
+
+            let expr = self.parse_expr()?;
+            elements.push(expr);
+
+            if let Some(token) = self.peek() {
+                if token.kind == TokenKind::RParen {
+                    break;
+                }
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+
+        let loc = self.peek().map(|t| t.location.clone()).unwrap_or_default();
+        self.expect_error(
+            TokenKind::RParen,
+            SyntaxError::UnmatchedBrackets { location: loc },
+        )?;
+
+        Ok(self.spanned(
+            Expr::Tuple(elements.iter().map(|e| e.raw.clone()).collect()),
+            location,
+        ))
+    }
+
+    fn parse_struct_cons(&mut self) -> ParseResult<SpannedExpr> {
+        // Struct constructor syntax: { field1: value1, field2: value2, ... }
+
+        let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
         self.expect(TokenKind::LCurly)?;
         let mut fields = Vec::new();
 
@@ -220,6 +299,14 @@ impl<'a> Parser<'a> {
             SyntaxError::UnmatchedBrackets { location: loc },
         )?;
 
-        Ok(Expr::StructCons { fields })
+        Ok(self.spanned(
+            Expr::StructCons {
+                fields: fields
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.raw.clone()))
+                    .collect(),
+            },
+            location,
+        ))
     }
 }

@@ -1,4 +1,4 @@
-use super::lexer::{BinOp, UnOp};
+use super::lexer::{BinOp, SourceLoc, UnOp};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
@@ -14,6 +14,7 @@ pub enum Ty {
     Function(Box<Ty>, Vec<Ty>), // return type, argument types
     Pointer(Box<Ty>),           // *ty
     Array(Box<Ty>),
+    Tuple(Vec<Ty>),                    // (ty1, ty2, ...
     Struct(String, Vec<(String, Ty)>), // name, fields
     UserDefined(String),
 }
@@ -29,6 +30,7 @@ pub enum Expr {
     Variable(String),
 
     Array(Vec<Expr>),
+    Tuple(Vec<Expr>),
 
     // Struct constructor
     StructCons { fields: Vec<(String, Expr)> },
@@ -40,6 +42,13 @@ pub enum Expr {
     Call { func: Box<Expr>, args: Vec<Expr> },
 }
 
+/// Expression with the source location attached to it
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpannedExpr {
+    pub raw: Expr,
+    pub location: SourceLoc,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expr(Expr),
@@ -48,7 +57,7 @@ pub enum Stmt {
     Local {
         name: String,
         ty: Option<Ty>,
-        value: Option<Expr>,
+        value: Option<SpannedExpr>,
     },
     StructDecl {
         name: String,
@@ -56,17 +65,17 @@ pub enum Stmt {
     },
     Assign {
         target: Expr,
-        value: Expr,
+        value: SpannedExpr,
     },
     If {
-        cond: Expr,
+        cond: SpannedExpr,
         then_block: Block,
         else_block: Option<Block>,
     },
     For {
         init: String,
-        from: Expr,
-        to: Expr,
+        from: SpannedExpr,
+        to: SpannedExpr,
         body: Block,
     },
     While {

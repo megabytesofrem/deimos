@@ -1,2 +1,2 @@
-pub(crate) mod ty_ast;
-pub mod typeck;
+pub mod context;
+pub mod hir;
