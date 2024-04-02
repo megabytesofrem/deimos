@@ -25,6 +25,9 @@ pub enum TypeckError {
         location: SourceLoc,
     },
 
+    #[error("Redefinition of local {name}")]
+    Redefinition { name: String, location: SourceLoc },
+
     #[error("Undefined local {name} being used before declaration")]
     UndefinedLocal { name: String, location: SourceLoc },
 
@@ -278,6 +281,14 @@ impl<'cx> Typeck<'cx> {
                 let ty = ty.clone().unwrap_or(Ty::Unknown);
                 let value = value.as_ref().map(|v| self.check_expr(v));
 
+                // Check if the local is not already defined
+                if self.ctx.get(name).is_some() {
+                    return Err(TypeckError::Redefinition {
+                        name: name.clone(),
+                        location: stmt.location.clone(),
+                    });
+                }
+
                 self.ctx.insert(name.clone(), ty);
                 Ok(())
             }
@@ -344,6 +355,24 @@ impl Default for Typeck<'_> {
 #[cfg(test)]
 pub mod typeck_tests {
     use super::*;
+
+    #[test]
+    fn redefinition_of_local() {
+        let mut typeck = Typeck::new();
+        let stmt = spanned!(
+            Stmt::Local {
+                name: "x".to_string(),
+                ty: None,
+                value: None,
+            },
+            SourceLoc::default()
+        );
+
+        typeck.check_stmt(&stmt).unwrap();
+        let result = typeck.check_stmt(&stmt);
+
+        assert!(result.is_err());
+    }
 
     #[test]
     fn expr_with_int_float() {

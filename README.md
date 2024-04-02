@@ -5,8 +5,16 @@
 
 The compiler for Deimos, a small, low-level Lua inspired language.
 
-## Naming 🏷️
-Deimos is the smaller moon of Mars, and the name is fitting for a tiny and unsafe Lua inspired language.
+```lua
+function main() 
+    io.print("Hello world")
+end
+```
 
-## Planned Features 🚀
-See **DESIGN_DECISIONS.md** for a list of planned features
+## Features
+- Fast compiler written in Rust
+- Clean syntax based on Lua
+- Support for low-level programming
+
+## Building
+- You'll need the latest stable version of the `rust` compiler.

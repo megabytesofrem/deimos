@@ -1,7 +1,4 @@
 pub mod context;
 
-// Lower to typed HIR
-pub mod thir;
-
-// Typechecker
+pub mod thir; // Lower to THIR
 pub mod typeck;
