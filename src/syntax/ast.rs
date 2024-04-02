@@ -23,6 +23,26 @@ pub enum Ty {
     UserDefined(String),
 }
 
+impl Ty {
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self,
+            Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::String | Ty::Void
+        )
+    }
+
+    pub fn is_valid_index_type(&self) -> bool {
+        matches!(
+            self,
+            Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::UserDefined(_)
+        )
+    }
+
+    pub fn is_valid_indexable_type(&self) -> bool {
+        matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::UserDefined(_))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Int(i64),
@@ -53,7 +73,7 @@ pub enum Expr {
         index: Box<Spanned<Expr>>,
     },
     Call {
-        func: Box<Spanned<Expr>>,
+        callee: Box<Spanned<Expr>>,
         args: Vec<Spanned<Expr>>,
     },
 }
@@ -75,7 +95,7 @@ pub enum Stmt {
         fields: Vec<(String, Ty)>,
     },
     Assign {
-        target: Expr,
+        target: Spanned<Expr>,
         value: Spanned<Expr>,
     },
     If {

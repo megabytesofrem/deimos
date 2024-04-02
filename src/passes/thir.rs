@@ -8,74 +8,74 @@ use crate::syntax::lexer::{BinOp, UnOp};
 use crate::syntax::span::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum HIRExpr {
+pub enum THIRExpr {
     // Primitive types
     Literal(Literal, Ty),
     Variable(String),
 
     // Operations
-    BinOp(Box<Spanned<HIRExpr>>, BinOp, Box<Spanned<HIRExpr>>),
-    UnOp(UnOp, Box<Spanned<HIRExpr>>),
+    BinOp(Box<Spanned<THIRExpr>>, BinOp, Box<Spanned<THIRExpr>>),
+    UnOp(UnOp, Box<Spanned<THIRExpr>>),
 
     Array {
-        elems: Vec<Spanned<HIRExpr>>,
+        elems: Vec<Spanned<THIRExpr>>,
     },
     Tuple {
-        elems: Vec<Spanned<HIRExpr>>,
+        elems: Vec<Spanned<THIRExpr>>,
     },
     StructCons {
-        fields: Vec<(String, Spanned<HIRExpr>)>,
+        fields: Vec<(String, Spanned<THIRExpr>)>,
     },
     ArrayIndex {
-        array: Box<Spanned<HIRExpr>>,
-        index: Box<Spanned<HIRExpr>>,
+        array: Box<Spanned<THIRExpr>>,
+        index: Box<Spanned<THIRExpr>>,
     },
     Call {
-        func: Box<Spanned<HIRExpr>>,
-        args: Vec<Spanned<HIRExpr>>,
+        callee: Box<Spanned<THIRExpr>>,
+        args: Vec<Spanned<THIRExpr>>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum HIRStmt {
-    Expr(HIRExpr),
-    Return(Option<Spanned<HIRExpr>>),
+pub enum THIRStmt {
+    Expr(THIRExpr),
+    Return(Option<Spanned<THIRExpr>>),
 
     Local {
         name: String,
         ty: Option<Ty>,
-        value: Option<Spanned<HIRExpr>>,
+        value: Option<Spanned<THIRExpr>>,
     },
     StructDecl {
         name: String,
         fields: Vec<(String, Ty)>,
     },
     Assign {
-        target: HIRExpr,
-        value: Spanned<HIRExpr>,
+        target: THIRExpr,
+        value: Spanned<THIRExpr>,
     },
     If {
-        cond: Spanned<HIRExpr>,
-        then_block: HIRBlock,
-        else_block: Option<HIRBlock>,
+        cond: Spanned<THIRExpr>,
+        then_block: THIRBlock,
+        else_block: Option<THIRBlock>,
     },
     For {
         init: String,
-        from: Spanned<HIRExpr>,
-        to: Spanned<HIRExpr>,
-        body: HIRBlock,
+        from: Spanned<THIRExpr>,
+        to: Spanned<THIRExpr>,
+        body: THIRBlock,
     },
     While {
-        cond: Spanned<HIRExpr>,
-        block: HIRBlock,
+        cond: Spanned<THIRExpr>,
+        block: THIRBlock,
     },
 }
 
-pub type HIRBlock = Vec<Spanned<HIRStmt>>;
-pub type HIRProgram = Vec<Spanned<HIRToplevelStmt>>;
+pub type THIRBlock = Vec<Spanned<THIRStmt>>;
+pub type THIRProgram = Vec<Spanned<THIRToplevelStmt>>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum HIRToplevelStmt {
-    Stmt(HIRStmt),
+pub enum THIRToplevelStmt {
+    Stmt(THIRStmt),
     ToplevelStmt(ToplevelStmt),
 }

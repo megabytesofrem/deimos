@@ -263,7 +263,10 @@ impl<'cx> Parser<'cx> {
         let expr = self.parse_expr()?;
         Ok(spanned!(
             Stmt::Assign {
-                target: Expr::Variable(ident.literal.to_string()),
+                target: spanned!(
+                    Expr::Variable(ident.literal.to_string()),
+                    ident.location.clone()
+                ),
                 value: expr,
             },
             ident.location
