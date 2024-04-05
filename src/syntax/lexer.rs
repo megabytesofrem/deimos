@@ -137,6 +137,35 @@ pub enum UnOp {
     Bang,
 }
 
+impl BinOp {
+    pub fn to_str(&self) -> &str {
+        match self {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+            BinOp::And => "&&",
+            BinOp::Or => "||",
+            BinOp::Eq => "==",
+            BinOp::BangEq => "!=",
+            BinOp::Less => "<",
+            BinOp::LessEq => "<=",
+            BinOp::Greater => ">",
+            BinOp::GreaterEq => ">=",
+        }
+    }
+}
+
+impl UnOp {
+    pub fn to_str(&self) -> &str {
+        match self {
+            UnOp::Neg => "-",
+            UnOp::Bang => "!",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,

@@ -1,10 +1,10 @@
 use crate::syntax::ast::ToplevelStmt;
 use crate::syntax::errors::SyntaxError;
 
-use super::{ParseResult, Parser, SourceLoc, TokenKind};
+use super::{Parser, Return, SourceLoc, TokenKind};
 
 impl<'a> Parser<'a> {
-    fn parse_import_path(&mut self) -> ParseResult<Vec<String>> {
+    fn parse_import_path(&mut self) -> Return<Vec<String>> {
         // Parse a path like "a.b.c" into a vector of strings ["a", "b", "c"]
         let mut path = vec![];
 
@@ -28,7 +28,7 @@ impl<'a> Parser<'a> {
         Ok(path)
     }
 
-    pub fn parse_import(&mut self) -> ParseResult<ToplevelStmt> {
+    pub fn parse_import(&mut self) -> Return<ToplevelStmt> {
         // import foo.bar [as baz]
         let peeked_token = self.expect(TokenKind::KwImport)?;
 
@@ -55,7 +55,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parse_cimport(&mut self) -> ParseResult<ToplevelStmt> {
+    pub fn parse_cimport(&mut self) -> Return<ToplevelStmt> {
         // cimport "foo_bar"
         self.expect(TokenKind::KwCImport)?;
         let header_path = self.expect(TokenKind::String)?.literal.to_string();

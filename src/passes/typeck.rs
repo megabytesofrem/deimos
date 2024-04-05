@@ -1,19 +1,19 @@
 // Type checker pass
 // 1. We take the AST
 // 2. We check the types of the AST and report errors
-// 3. We return a THIR (Typed HIR) representation of the AST
+// 3. We return a typed representation of the AST
 
 use super::context::ContextStack;
 use crate::{
     spanned,
     syntax::{
         ast::{Block, Expr, Literal, Program, Stmt, ToplevelStmt, Ty},
-        lexer::{BinOp, SourceLoc, UnOp},
-        span::Spanned,
+        lexer::{BinOp, SourceLoc},
+        span::{self, Spanned},
     },
 };
 
-use super::thir::*;
+use super::typed::*;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -49,7 +49,8 @@ pub enum TypeckError {
     },
 }
 
-type TypeckResult<T> = Result<T, TypeckError>;
+// Holds the type that is returned from the type checker
+type Return<T> = Result<T, TypeckError>;
 
 // Type checker pass
 #[derive(Debug, Clone)]
@@ -68,7 +69,7 @@ impl<'cx> Typeck<'cx> {
 
     // Inference functions
 
-    fn infer_binop(&self, lhs: &Spanned<Expr>, op: BinOp, rhs: &Spanned<Expr>) -> TypeckResult<Ty> {
+    fn infer_binop(&self, lhs: &Spanned<Expr>, op: BinOp, rhs: &Spanned<Expr>) -> Return<Ty> {
         let lhs_ty = self.infer_expr(lhs)?;
         let rhs_ty = self.infer_expr(rhs)?;
 
@@ -103,7 +104,7 @@ impl<'cx> Typeck<'cx> {
         }
     }
 
-    fn infer_array(&self, elems: &[Spanned<Expr>]) -> TypeckResult<Ty> {
+    fn infer_array(&self, elems: &[Spanned<Expr>]) -> Return<Ty> {
         if elems.is_empty() {
             return Ok(Ty::Array(Box::new(Ty::Unknown)));
         }
@@ -125,7 +126,7 @@ impl<'cx> Typeck<'cx> {
         Ok(Ty::Array(Box::new(elem_ty)))
     }
 
-    fn infer_tuple(&self, elems: &[Spanned<Expr>]) -> TypeckResult<Ty> {
+    fn infer_tuple(&self, elems: &[Spanned<Expr>]) -> Return<Ty> {
         let mut tys = Vec::new();
         for elem in elems {
             tys.push(self.infer_expr(elem)?);
@@ -138,7 +139,7 @@ impl<'cx> Typeck<'cx> {
         &self,
         indexable: &Spanned<Expr>,
         index: &Spanned<Expr>,
-    ) -> TypeckResult<Ty> {
+    ) -> Return<Ty> {
         let indexable_ty = self.infer_expr(indexable)?;
         let index_ty = self.infer_expr(index)?;
 
@@ -161,7 +162,7 @@ impl<'cx> Typeck<'cx> {
         }
     }
 
-    fn infer_expr(&self, expr: &Spanned<Expr>) -> TypeckResult<Ty> {
+    fn infer_expr(&self, expr: &Spanned<Expr>) -> Return<Ty> {
         match &expr.target {
             Expr::Literal(lit) => self.check_literal(lit),
             Expr::Variable(name) => self.check_variable(name, expr.location.clone()),
@@ -175,8 +176,10 @@ impl<'cx> Typeck<'cx> {
     }
 
     // Checking functions
+    // We operate on the AST wrapped in Spanned<T> and return a THIR lowered
+    // equivalent, e.g Spanned<Stmt> -> Spanned<THIRStmt>.
 
-    fn check_variable(&self, name: &str, location: SourceLoc) -> TypeckResult<Ty> {
+    fn check_variable(&self, name: &str, location: SourceLoc) -> Return<Ty> {
         self.ctx
             .get(name)
             .cloned()
@@ -186,7 +189,7 @@ impl<'cx> Typeck<'cx> {
             })
     }
 
-    fn check_literal(&self, lit: &Literal) -> TypeckResult<Ty> {
+    fn check_literal(&self, lit: &Literal) -> Return<Ty> {
         match lit {
             Literal::Int(_) => Ok(Ty::Int),
             Literal::Float(_) => Ok(Ty::Float),
@@ -196,11 +199,14 @@ impl<'cx> Typeck<'cx> {
         }
     }
 
-    fn check_expr(&mut self, expr: &Spanned<Expr>) -> TypeckResult<THIRExpr> {
+    fn check_expr(&mut self, expr: &Spanned<Expr>) -> Return<Spanned<TExpr>> {
         let ty = self.infer_expr(expr)?;
         match &expr.target {
             Expr::Literal(lit) => {
-                return Ok(THIRExpr::Literal(lit.clone(), ty));
+                return Ok(spanned!(
+                    TExpr::Literal(lit.clone(), ty),
+                    expr.location.clone()
+                ));
             }
             Expr::Variable(name) => {
                 let ty2 = self.check_variable(name, expr.location.clone())?;
@@ -212,70 +218,83 @@ impl<'cx> Typeck<'cx> {
                     });
                 } else {
                     // Variable is valid
-                    return Ok(THIRExpr::Variable(name.clone()));
+                    return Ok(spanned!(
+                        TExpr::Variable(name.clone()),
+                        expr.location.clone()
+                    ));
                 }
             }
             Expr::BinOp(lhs, op, rhs) => {
-                let lhs_ = spanned!(self.check_expr(lhs)?, lhs.location.clone());
-                let rhs_ = spanned!(self.check_expr(rhs)?, rhs.location.clone());
-                return Ok(THIRExpr::BinOp(Box::new(lhs_), op.clone(), Box::new(rhs_)));
+                return Ok(spanned!(
+                    TExpr::BinOp(
+                        Box::new(self.check_expr(lhs)?),
+                        op.clone(),
+                        Box::new(self.check_expr(rhs)?)
+                    ),
+                    expr.location.clone()
+                ));
             }
             Expr::UnOp(op, expr) => {
-                let expr_ = spanned!(self.check_expr(expr)?, expr.location.clone());
-                return Ok(THIRExpr::UnOp(op.clone(), Box::new(expr_)));
+                let expr = self.check_expr(expr)?;
+                return Ok(spanned!(
+                    TExpr::UnOp(op.clone(), Box::new(expr.clone())),
+                    expr.location.clone()
+                ));
             }
-            Expr::Array(elems) => {
-                let mut elems_ = Vec::new();
+            Expr::Array(elems) | Expr::Tuple(elems) => {
+                let mut array = Vec::new();
                 for elem in elems {
-                    elems_.push(spanned!(self.check_expr(elem)?, elem.location.clone()));
+                    array.push(self.check_expr(elem)?);
                 }
 
-                return Ok(THIRExpr::Array { elems: elems_ });
-            }
-            Expr::Tuple(elems) => {
-                let mut elems_ = Vec::new();
-                for elem in elems {
-                    elems_.push(spanned!(self.check_expr(elem)?, elem.location.clone()));
-                }
-
-                return Ok(THIRExpr::Tuple { elems: elems_ });
+                return Ok(spanned!(
+                    TExpr::Array { elems: array },
+                    expr.location.clone()
+                ));
             }
             Expr::ArrayIndex { array, index } => {
-                let array_ = spanned!(self.check_expr(array)?, array.location.clone());
-                let index_ = spanned!(self.check_expr(index)?, index.location.clone());
-                return Ok(THIRExpr::ArrayIndex {
-                    array: Box::new(array_),
-                    index: Box::new(index_),
-                });
+                let array = self.check_expr(array)?;
+                let index = self.check_expr(index)?;
+                return Ok(spanned!(
+                    TExpr::ArrayIndex {
+                        array: Box::new(array),
+                        index: Box::new(index),
+                    },
+                    expr.location.clone()
+                ));
             }
             Expr::Call { callee, args } => {
-                let callee_ = spanned!(self.check_expr(callee)?, callee.location.clone());
+                let callee = self.check_expr(expr)?;
                 let mut args_ = Vec::new();
                 for arg in args {
-                    args_.push(spanned!(self.check_expr(arg)?, arg.location.clone()));
+                    args_.push(self.check_expr(arg)?);
                 }
 
-                return Ok(THIRExpr::Call {
-                    callee: Box::new(callee_),
-                    args: args_,
-                });
+                return Ok(spanned!(
+                    TExpr::Call {
+                        callee: Box::new(callee),
+                        args: args_,
+                    },
+                    expr.location.clone()
+                ));
             }
             _ => unimplemented!(),
         }
     }
 
-    fn check_stmt(&mut self, stmt: &Spanned<Stmt>) -> TypeckResult<()> {
+    fn check_stmt(&mut self, stmt: &Spanned<Stmt>) -> Return<Spanned<TStmt>> {
         match &stmt.target {
             Stmt::Expr(expr) => {
-                self.check_expr(expr)?;
-                Ok(())
+                let expr = self.check_expr(expr)?;
+                Ok(spanned!(TStmt::Expr(expr.target), stmt.location.clone()))
             }
             Stmt::Return(expr) => {
                 if let Some(expr) = expr {
-                    self.check_expr(expr)?;
+                    let expr = self.check_expr(expr)?;
+                    return Ok(spanned!(TStmt::Return(Some(expr)), stmt.location.clone()));
                 }
 
-                Ok(())
+                Ok(spanned!(TStmt::Return(None), stmt.location.clone()))
             }
             Stmt::Local { name, ty, value } => {
                 let ty = ty.clone().unwrap_or(Ty::Unknown);
@@ -289,8 +308,15 @@ impl<'cx> Typeck<'cx> {
                     });
                 }
 
-                self.ctx.insert(name.clone(), ty);
-                Ok(())
+                self.ctx.insert(name.clone(), ty.clone());
+                Ok(spanned!(
+                    TStmt::Local {
+                        name: name.clone(),
+                        ty: Some(ty),
+                        value: value.map(|v| v.unwrap()),
+                    },
+                    stmt.location.clone()
+                ))
             }
             Stmt::Assign { target, value } => {
                 let target_ty = self.infer_expr(target)?;
@@ -304,45 +330,53 @@ impl<'cx> Typeck<'cx> {
                     });
                 }
 
-                Ok(())
+                Ok(spanned!(
+                    TStmt::Assign {
+                        target: self.check_expr(target)?.target,
+                        value: self.check_expr(value)?,
+                    },
+                    stmt.location.clone()
+                ))
             }
             _ => unimplemented!(),
         }
     }
 
-    fn check_block(&mut self, block: &Block) -> TypeckResult<()> {
-        for stmt in block {
-            self.check_stmt(&stmt)?;
-        }
+    fn check_block(&mut self, block: &Block) -> Return<Vec<Spanned<TStmt>>> {
+        let block_ = block
+            .iter()
+            .map(|stmt| self.check_stmt(stmt))
+            .collect::<Return<Vec<Spanned<TStmt>>>>()?;
 
-        Ok(())
+        Ok(block_)
     }
 
-    fn check_toplevel_stmt(&mut self, stmt: &Spanned<ToplevelStmt>) -> TypeckResult<()> {
+    fn check_toplevel_stmt(
+        &mut self,
+        stmt: &Spanned<ToplevelStmt>,
+    ) -> Return<Spanned<TToplevelStmt>> {
         match &stmt.target {
-            ToplevelStmt::Stmt(stmt) => self.check_stmt(stmt),
-            ToplevelStmt::Import { .. } => Ok(()),
-            ToplevelStmt::FunctionDecl {
-                name,
-                return_ty,
-                params,
-                body,
-            } => {
-                self.ctx.insert(name.clone(), return_ty.clone());
-                Ok(())
+            ToplevelStmt::Stmt(stmt) => {
+                let stmt = self.check_stmt(stmt)?;
+                Ok(spanned!(
+                    TToplevelStmt::Stmt(stmt.clone()),
+                    stmt.location.clone()
+                ))
             }
             _ => unimplemented!(),
         }
     }
 
-    pub fn check(ast: Program) -> TypeckResult<()> {
+    pub fn check(ast: Program) -> Return<TProgram> {
         let mut typeck = Typeck::new();
 
+        let mut thir = Vec::new();
         for stmt in ast {
-            typeck.check_toplevel_stmt(&stmt)?;
+            let stmt = typeck.check_toplevel_stmt(&stmt)?;
+            thir.push(stmt);
         }
 
-        Ok(())
+        Ok(thir)
     }
 }
 

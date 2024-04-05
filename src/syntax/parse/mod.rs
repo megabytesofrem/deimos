@@ -10,7 +10,7 @@ use super::span::Spanned;
 use super::{ast::Stmt, ast::Ty, errors::SyntaxError};
 
 /// Result type for parsing
-type ParseResult<'cx, T> = Result<T, SyntaxError>;
+type Return<'cx, T> = Result<T, SyntaxError>;
 type ParameterPair = (String, Ty);
 
 pub struct Parser<'cx> {
@@ -82,7 +82,7 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Check if the next token is of the expected kind without advancing
-    pub fn check(&mut self, kind: TokenKind, err: SyntaxError) -> ParseResult<&Token> {
+    pub fn check(&mut self, kind: TokenKind, err: SyntaxError) -> Return<&Token> {
         match self.peek() {
             Some(token) if token.kind == kind => Ok(token),
             _ => Err(err),
@@ -90,7 +90,7 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Consume the next token and return it if it matches the expected kind
-    pub fn expect(&mut self, kind: TokenKind) -> ParseResult<Token<'cx>> {
+    pub fn expect(&mut self, kind: TokenKind) -> Return<Token<'cx>> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         if token.kind == kind {
             Ok(token)
@@ -103,11 +103,11 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Remap the error from `expect` to a custom error passed in
-    pub fn expect_error(&mut self, kind: TokenKind, err: SyntaxError) -> ParseResult<Token<'cx>> {
+    pub fn expect_error(&mut self, kind: TokenKind, err: SyntaxError) -> Return<Token<'cx>> {
         self.expect(kind).map_err(|_| err)
     }
 
-    fn parse_type(&mut self) -> ParseResult<Ty> {
+    fn parse_type(&mut self) -> Return<Ty> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         match token.kind {
             TokenKind::Void => Ok(Ty::Void),
@@ -145,14 +145,14 @@ impl<'cx> Parser<'cx> {
         }
     }
 
-    fn parse_annotated_param(&mut self) -> ParseResult<ParameterPair> {
+    fn parse_annotated_param(&mut self) -> Return<ParameterPair> {
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Colon)?;
         let ty = self.parse_type()?;
         Ok((ident.literal.to_string(), ty))
     }
 
-    fn parse_annotated_params(&mut self) -> ParseResult<Vec<ParameterPair>> {
+    fn parse_annotated_params(&mut self) -> Return<Vec<ParameterPair>> {
         let mut params = Vec::new();
 
         // Parse comma separated list of annotated parameters
@@ -176,7 +176,7 @@ impl<'cx> Parser<'cx> {
         Ok(params)
     }
 
-    fn parse_params(&mut self) -> ParseResult<Vec<String>> {
+    fn parse_params(&mut self) -> Return<Vec<String>> {
         let mut params = Vec::new();
 
         // Parse comma separated list of identifiers.
@@ -200,7 +200,7 @@ impl<'cx> Parser<'cx> {
         Ok(params)
     }
 
-    fn parse_toplevel_stmt(&mut self) -> ParseResult<ToplevelStmt> {
+    fn parse_toplevel_stmt(&mut self) -> Return<ToplevelStmt> {
         match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwImport => self.parse_import(),
@@ -215,7 +215,7 @@ impl<'cx> Parser<'cx> {
     }
 
     // FIXME: change this back to private
-    pub fn parse_stmt(&mut self) -> ParseResult<Spanned<Stmt>> {
+    pub fn parse_stmt(&mut self) -> Return<Spanned<Stmt>> {
         match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwLocal => self.parse_local_declare(),
@@ -237,7 +237,7 @@ impl<'cx> Parser<'cx> {
     }
 
     // Statements
-    fn parse_local_declare(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_local_declare(&mut self) -> Return<Spanned<Stmt>> {
         // local ident:type = expr
         let t = self.expect(TokenKind::KwLocal)?;
         let ident = self.expect(TokenKind::Ident)?;
@@ -256,7 +256,7 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_assignment(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_assignment(&mut self) -> Return<Spanned<Stmt>> {
         // ident = expr
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Equal)?;
@@ -273,7 +273,7 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_if_stmt(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_if_stmt(&mut self) -> Return<Spanned<Stmt>> {
         let t = self.expect(TokenKind::KwIf)?;
         let condition = self.parse_expr()?;
 
@@ -301,7 +301,7 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_for_loop(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_for_loop(&mut self) -> Return<Spanned<Stmt>> {
         // for counter = start, end do
         // .. body
         // end
@@ -327,7 +327,7 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_while_loop(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_while_loop(&mut self) -> Return<Spanned<Stmt>> {
         // while condition do
         // .. body
         // end
@@ -339,7 +339,7 @@ impl<'cx> Parser<'cx> {
         Ok(spanned!(Stmt::While { cond, block }, t.location))
     }
 
-    fn parse_return(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_return(&mut self) -> Return<Spanned<Stmt>> {
         // return expr?
         let t = self.expect(TokenKind::KwReturn)?;
         let expr = if let Some(token) = self.peek() {
@@ -356,7 +356,7 @@ impl<'cx> Parser<'cx> {
     }
 
     // NOTE: Maybe come up with a better syntax for this?
-    fn parse_struct_declare(&mut self) -> ParseResult<Spanned<Stmt>> {
+    fn parse_struct_declare(&mut self) -> Return<Spanned<Stmt>> {
         // struct name = { field* }
         let t = self.expect(TokenKind::KwStruct)?;
         let name = self.expect(TokenKind::Ident)?;
@@ -389,7 +389,7 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_function_declare(&mut self) -> ParseResult<ToplevelStmt> {
+    fn parse_function_declare(&mut self) -> Return<ToplevelStmt> {
         // function name(params):return_type?
         // .. body
         // end
@@ -422,7 +422,7 @@ impl<'cx> Parser<'cx> {
     }
 
     // FIXME: change this back to private
-    pub fn parse_block(&mut self) -> ParseResult<Block> {
+    pub fn parse_block(&mut self) -> Return<Block> {
         let mut stmts = Vec::new();
 
         while let Some(token) = self.peek() {
@@ -436,7 +436,7 @@ impl<'cx> Parser<'cx> {
         Ok(stmts)
     }
 
-    pub fn parse(src: &'cx str) -> ParseResult<'cx, Vec<Spanned<ToplevelStmt>>> {
+    pub fn parse(src: &'cx str) -> Return<'cx, Vec<Spanned<ToplevelStmt>>> {
         // node: (function_declare | stmt)
         // nodes: node*
         let mut parser = Parser::new(src);

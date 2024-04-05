@@ -1,4 +1,5 @@
-use super::{ParseResult, Parser, SourceLoc, Token};
+use super::{Parser, Return, Token};
+
 use crate::spanned;
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
@@ -34,7 +35,7 @@ fn tokenkind_to_unop(kind: &TokenKind) -> UnOp {
 }
 
 impl<'a> Parser<'a> {
-    fn parse_expr_prec(&mut self, min_prec: u8) -> ParseResult<Spanned<Expr>> {
+    fn parse_expr_prec(&mut self, min_prec: u8) -> Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
         let mut lhs = self.parse_value()?;
 
@@ -74,11 +75,11 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
-    pub fn parse_expr(&mut self) -> ParseResult<Spanned<Expr>> {
+    pub fn parse_expr(&mut self) -> Return<Spanned<Expr>> {
         self.parse_expr_prec(0)
     }
 
-    fn parse_starting_ident(&mut self, name: String) -> ParseResult<Spanned<Expr>> {
+    fn parse_starting_ident(&mut self, name: String) -> Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
 
         if let Some(TokenKind::LParen) = self.peek().map(|t| &t.kind) {
@@ -96,7 +97,7 @@ impl<'a> Parser<'a> {
         Ok(spanned!(Expr::Variable(name), location))
     }
 
-    fn parse_literal(&mut self, token: &Token) -> ParseResult<Literal> {
+    fn parse_literal(&mut self, token: &Token) -> Return<Literal> {
         let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
 
         match token.kind {
@@ -107,11 +108,11 @@ impl<'a> Parser<'a> {
             TokenKind::StringLit => Ok(Literal::String(strip_quotes(token.literal).to_string())),
             TokenKind::KwTrue => Ok(Literal::Bool(true)),
             TokenKind::KwFalse => Ok(Literal::Bool(false)),
-            _ => panic!("yes"),
+            _ => panic!("parse_literal"),
         }
     }
 
-    pub fn parse_value(&mut self) -> ParseResult<Spanned<Expr>> {
+    pub fn parse_value(&mut self) -> Return<Spanned<Expr>> {
         // Hardcoded list of expected tokens for error messages
         let expected_tokens = [
             TokenKind::Int,
@@ -169,7 +170,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_array_indexer(&mut self, array: Expr) -> ParseResult<Spanned<Expr>> {
+    fn parse_array_indexer(&mut self, array: Expr) -> Return<Spanned<Expr>> {
         let mut location = self.peek().map(|t| t.clone().location).unwrap_or_default();
         let arr = self.parse_expr()?;
 
@@ -200,7 +201,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_array_literal(&mut self) -> ParseResult<Spanned<Expr>> {
+    fn parse_array_literal(&mut self) -> Return<Spanned<Expr>> {
         // Array syntax: [value1, value2, ...]
         let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
 
@@ -237,7 +238,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_tuple_literal(&mut self) -> ParseResult<Spanned<Expr>> {
+    fn parse_tuple_literal(&mut self) -> Return<Spanned<Expr>> {
         // Tuple syntax: (value1, value2, ...)
         // Tuples are represented in the backend as anonymous structs and can be returned from functions
 
@@ -274,7 +275,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_struct_cons(&mut self) -> ParseResult<Spanned<Expr>> {
+    fn parse_struct_cons(&mut self) -> Return<Spanned<Expr>> {
         // Struct constructor syntax: { field1: value1, field2: value2, ... }
 
         let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
