@@ -1,8 +1,8 @@
+//
 // Typed AST transformation pass
-// 1. We take the AST
-// 2. We lower it, bit by bit into a typed representation
+//
 
-use crate::syntax::ast::{Block, Expr, Literal, ToplevelStmt, Ty};
+use crate::syntax::ast::{Literal, Ty};
 use crate::syntax::lexer::{BinOp, UnOp};
 use crate::syntax::span::Spanned;
 
@@ -10,7 +10,7 @@ use crate::syntax::span::Spanned;
 pub enum TExpr {
     // Primitive types
     Literal(Literal, Ty),
-    Variable(String),
+    Variable(String, Ty),
 
     // Operations
     BinOp(Box<Spanned<TExpr>>, BinOp, Box<Spanned<TExpr>>),
@@ -71,10 +71,21 @@ pub enum TStmt {
 }
 
 pub type TBlock = Vec<Spanned<TStmt>>;
-pub type TProgram = Vec<Spanned<TToplevelStmt>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TToplevelStmt {
-    Stmt(Spanned<TStmt>),
-    ToplevelStmt(ToplevelStmt),
+    Import { path: Vec<String>, alias: Option<String> },
+
+    FunctionDecl {
+        name: String,
+        params: Vec<(String, Ty)>,
+        return_ty: Ty,
+        body: TBlock,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedAst {
+    pub toplevels: Vec<Spanned<TToplevelStmt>>,
+    pub stmts: Vec<Spanned<TStmt>>,
 }

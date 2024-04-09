@@ -1,13 +1,11 @@
+use super::{ast::Stmt, ast::Ty, errors::SyntaxError};
+use super::ast::{Ast, Block, Expr, ToplevelStmt};
+use super::lexer::*;
+use super::span::{spanned, Spanned};
+
 // Sub-parsers
 pub mod expr;
 pub mod import_stmt;
-
-use crate::spanned;
-
-use super::ast::{Block, Expr, ToplevelStmt};
-use super::lexer::*;
-use super::span::Spanned;
-use super::{ast::Stmt, ast::Ty, errors::SyntaxError};
 
 /// Result type for parsing
 type Return<'cx, T> = Result<T, SyntaxError>;
@@ -70,8 +68,8 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Peek at the next token
-    pub fn peek(&mut self) -> Option<&Token> {
-        self.tokens.peek()
+    pub fn peek(&mut self) -> Option<Token> {
+        self.tokens.peek().cloned()
     }
 
     /// Advance the parser by one token
@@ -82,7 +80,7 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Check if the next token is of the expected kind without advancing
-    pub fn check(&mut self, kind: TokenKind, err: SyntaxError) -> Return<&Token> {
+    pub fn check(&mut self, kind: TokenKind, err: SyntaxError) -> Return<Token> {
         match self.peek() {
             Some(token) if token.kind == kind => Ok(token),
             _ => Err(err),
@@ -205,10 +203,10 @@ impl<'cx> Parser<'cx> {
             Some(token) => match token.kind {
                 TokenKind::KwImport => self.parse_import(),
                 TokenKind::KwFunction => self.parse_function_declare(),
-                _ => {
-                    let stmt = self.parse_stmt()?;
-                    Ok(ToplevelStmt::Stmt(stmt))
-                }
+                _ => Err(SyntaxError::UnexpectedToken {
+                    token: token.kind.clone(),
+                    location: token.location.clone(),
+                }),
             },
             None => Err(SyntaxError::UnexpectedEof),
         }
@@ -246,13 +244,14 @@ impl<'cx> Parser<'cx> {
 
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
-        Ok(spanned!(
+
+        Ok(spanned(
             Stmt::Local {
                 name: ident.literal.to_string(),
                 ty: Some(ty),
                 value: Some(expr),
             },
-            t.location
+            t.location,
         ))
     }
 
@@ -261,15 +260,15 @@ impl<'cx> Parser<'cx> {
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
-        Ok(spanned!(
+        Ok(spanned(
             Stmt::Assign {
-                target: spanned!(
+                target: spanned(
                     Expr::Variable(ident.literal.to_string()),
-                    ident.location.clone()
+                    ident.location.clone(),
                 ),
                 value: expr,
             },
-            ident.location
+            ident.location,
         ))
     }
 
@@ -291,19 +290,19 @@ impl<'cx> Parser<'cx> {
             None
         };
 
-        Ok(spanned!(
+        Ok(spanned(
             Stmt::If {
                 cond: condition,
                 then_block,
                 else_block,
             },
-            t.location
+            t.location,
         ))
     }
 
     fn parse_for_loop(&mut self) -> Return<Spanned<Stmt>> {
         // for counter = start, end do
-        // .. body
+        //  body
         // end
 
         let t = self.expect(TokenKind::KwFor)?;
@@ -316,27 +315,27 @@ impl<'cx> Parser<'cx> {
         self.expect(TokenKind::KwDo)?;
         let body = self.parse_block()?;
 
-        Ok(spanned!(
+        Ok(spanned(
             Stmt::For {
                 init: ident.literal.to_string(),
                 from: start,
                 to: end,
                 body,
             },
-            t.location
+            t.location,
         ))
     }
 
     fn parse_while_loop(&mut self) -> Return<Spanned<Stmt>> {
         // while condition do
-        // .. body
+        //  body
         // end
 
         let t = self.expect(TokenKind::KwWhile)?;
         let cond = self.parse_expr()?;
         self.expect(TokenKind::KwDo)?;
         let block = self.parse_block()?;
-        Ok(spanned!(Stmt::While { cond, block }, t.location))
+        Ok(spanned(Stmt::While { cond, block }, t.location))
     }
 
     fn parse_return(&mut self) -> Return<Spanned<Stmt>> {
@@ -352,7 +351,7 @@ impl<'cx> Parser<'cx> {
             None
         };
 
-        Ok(spanned!(Stmt::Return(expr), t.location))
+        Ok(spanned(Stmt::Return(expr), t.location))
     }
 
     // NOTE: Maybe come up with a better syntax for this?
@@ -365,7 +364,7 @@ impl<'cx> Parser<'cx> {
         self.expect(TokenKind::LCurly)?;
         let mut fields = Vec::new();
 
-        while let Some(token) = self.peek() {
+        while let Some(_token) = self.peek() {
             let ident = self.expect(TokenKind::Ident)?;
             self.expect(TokenKind::Colon)?;
             let ty = self.parse_type()?;
@@ -380,18 +379,18 @@ impl<'cx> Parser<'cx> {
         }
 
         self.expect(TokenKind::RCurly)?;
-        Ok(spanned!(
+        Ok(spanned(
             Stmt::StructDecl {
                 name: name.literal.to_string(),
                 fields,
             },
-            t.location
+            t.location,
         ))
     }
 
     fn parse_function_declare(&mut self) -> Return<ToplevelStmt> {
         // function name(params):return_type?
-        // .. body
+        //  body
         // end
 
         let mut return_type = Ty::Void;
@@ -436,30 +435,44 @@ impl<'cx> Parser<'cx> {
         Ok(stmts)
     }
 
-    pub fn parse(src: &'cx str) -> Return<'cx, Vec<Spanned<ToplevelStmt>>> {
+    pub fn parse(src: &'cx str) -> Return<'cx, Ast> {
         // node: (function_declare | stmt)
         // nodes: node*
         let mut parser = Parser::new(src);
-        let mut nodes = Vec::new();
+
+        let mut comment_nodes: Vec<(SourceLoc, String)> = Vec::new();
+        let mut toplevels: Vec<Spanned<ToplevelStmt>> = Vec::new();
+        let mut stmts: Vec<Spanned<Stmt>> = Vec::new();
 
         while let Some(token) = parser.peek() {
             match token.kind {
-                // TODO: Skip comments while still storing them in the AST
                 TokenKind::Comment => {
+                    // TODO: Skip comments while still storing them in the AST
+                    let _location = token.location.clone();
                     parser.advance();
+
+                    // TODO: fix the below code giving me a borrow checker error
+                    //comment_nodes.push((location, token.literal.clone().to_string()));
                 }
                 TokenKind::KwFunction => {
+                    // Functions are top-level nodes
                     let location = token.location.clone();
-                    nodes.push(spanned!(parser.parse_function_declare()?, location));
+                    toplevels.push(spanned(parser.parse_function_declare()?, location));
                 }
+
+                // Statements can exist outside a function or block
                 _ => {
                     let location = token.location.clone();
-                    nodes.push(spanned!(ToplevelStmt::Stmt(parser.parse_stmt()?), location));
+                    stmts.push(spanned(parser.parse_stmt()?.target, location));
                 }
             }
         }
 
-        Ok(nodes)
+        Ok(Ast {
+            comments: comment_nodes,
+            toplevels,
+            stmts,
+        })
     }
 }
 

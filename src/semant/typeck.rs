@@ -1,20 +1,17 @@
+//
 // Type checker pass
-// 1. We take the AST
-// 2. We check the types of the AST and report errors
-// 3. We return a typed representation of the AST
+//
 
-use super::context::ContextStack;
-use crate::{
-    spanned,
-    syntax::{
-        ast::{Block, Expr, Literal, Program, Stmt, ToplevelStmt, Ty},
-        lexer::{BinOp, SourceLoc},
-        span::{self, Spanned},
-    },
+use thiserror::Error;
+
+use crate::syntax::{
+    ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty},
+    lexer::{BinOp, SourceLoc},
+    span::{spanned, Spanned},
 };
 
-use super::typed::*;
-use thiserror::Error;
+use super::scope::ScopeStack;
+use super::typed_ast::*;
 
 #[derive(Debug, Clone, Error)]
 pub enum TypeckError {
@@ -55,14 +52,14 @@ type Return<T> = Result<T, TypeckError>;
 // Type checker pass
 #[derive(Debug, Clone)]
 pub struct Typeck<'cx> {
-    ctx: ContextStack,
+    ctx: ScopeStack,
     marker: std::marker::PhantomData<&'cx ()>,
 }
 
 impl<'cx> Typeck<'cx> {
     pub fn new() -> Self {
         Typeck {
-            ctx: ContextStack::new(),
+            ctx: ScopeStack::new(),
             marker: std::marker::PhantomData,
         }
     }
@@ -176,8 +173,7 @@ impl<'cx> Typeck<'cx> {
     }
 
     // Checking functions
-    // We operate on the AST wrapped in Spanned<T> and return a THIR lowered
-    // equivalent, e.g Spanned<Stmt> -> Spanned<THIRStmt>.
+    // NOTE: We operate on the AST wrapped in Spanned<T>
 
     fn check_variable(&self, name: &str, location: SourceLoc) -> Return<Ty> {
         self.ctx
@@ -189,8 +185,8 @@ impl<'cx> Typeck<'cx> {
             })
     }
 
-    fn check_literal(&self, lit: &Literal) -> Return<Ty> {
-        match lit {
+    fn check_literal(&self, literal: &Literal) -> Return<Ty> {
+        match literal {
             Literal::Int(_) => Ok(Ty::Int),
             Literal::Float(_) => Ok(Ty::Float),
             Literal::Double(_) => Ok(Ty::Double),
@@ -201,145 +197,123 @@ impl<'cx> Typeck<'cx> {
 
     fn check_expr(&mut self, expr: &Spanned<Expr>) -> Return<Spanned<TExpr>> {
         let ty = self.infer_expr(expr)?;
-        match &expr.target {
-            Expr::Literal(lit) => {
-                return Ok(spanned!(
-                    TExpr::Literal(lit.clone(), ty),
-                    expr.location.clone()
-                ));
-            }
-            Expr::Variable(name) => {
-                let ty2 = self.check_variable(name, expr.location.clone())?;
-                if ty != ty2 {
-                    return Err(TypeckError::TypeMismatch {
-                        expected: ty,
-                        found: ty2,
-                        location: expr.location.clone(),
-                    });
-                } else {
-                    // Variable is valid
-                    return Ok(spanned!(
-                        TExpr::Variable(name.clone()),
-                        expr.location.clone()
+
+        expr.clone().flat_map_spanned(|target| {
+            match target {
+                Expr::Literal(lit) => {
+                    return Ok(TExpr::Literal(lit.clone(), ty.clone()));
+                }
+                Expr::Variable(name) => {
+                    let ty2 = self.check_variable(&name, expr.location.clone())?;
+                    if ty != ty2 {
+                        return Err(TypeckError::TypeMismatch {
+                            expected: ty,
+                            found: ty2,
+                            location: expr.location.clone(),
+                        });
+                    } else {
+                        // Variable is valid
+                        return Ok(TExpr::Variable(name.clone(), ty.clone()));
+                    }
+                }
+                Expr::BinOp(lhs, op, rhs) => {
+                    return Ok(TExpr::BinOp(
+                        Box::new(self.check_expr(&lhs)?),
+                        op.clone(),
+                        Box::new(self.check_expr(&rhs)?),
                     ));
                 }
-            }
-            Expr::BinOp(lhs, op, rhs) => {
-                return Ok(spanned!(
-                    TExpr::BinOp(
-                        Box::new(self.check_expr(lhs)?),
-                        op.clone(),
-                        Box::new(self.check_expr(rhs)?)
-                    ),
-                    expr.location.clone()
-                ));
-            }
-            Expr::UnOp(op, expr) => {
-                let expr = self.check_expr(expr)?;
-                return Ok(spanned!(
-                    TExpr::UnOp(op.clone(), Box::new(expr.clone())),
-                    expr.location.clone()
-                ));
-            }
-            Expr::Array(elems) | Expr::Tuple(elems) => {
-                let mut array = Vec::new();
-                for elem in elems {
-                    array.push(self.check_expr(elem)?);
+                Expr::UnOp(op, expr) => {
+                    let expr = self.check_expr(&expr)?;
+                    return Ok(TExpr::UnOp(op.clone(), Box::new(expr.clone())));
                 }
+                Expr::Array(elems) | Expr::Tuple(elems) => {
+                    let mut array = Vec::new();
+                    for elem in elems {
+                        array.push(self.check_expr(&elem)?);
+                    }
 
-                return Ok(spanned!(
-                    TExpr::Array { elems: array },
-                    expr.location.clone()
-                ));
-            }
-            Expr::ArrayIndex { array, index } => {
-                let array = self.check_expr(array)?;
-                let index = self.check_expr(index)?;
-                return Ok(spanned!(
-                    TExpr::ArrayIndex {
+                    return Ok(TExpr::Array { elems: array });
+                }
+                Expr::ArrayIndex { array, index } => {
+                    let array = self.check_expr(&array)?;
+                    let index = self.check_expr(&index)?;
+                    return Ok(TExpr::ArrayIndex {
                         array: Box::new(array),
                         index: Box::new(index),
-                    },
-                    expr.location.clone()
-                ));
-            }
-            Expr::Call { callee, args } => {
-                let callee = self.check_expr(expr)?;
-                let mut args_ = Vec::new();
-                for arg in args {
-                    args_.push(self.check_expr(arg)?);
+                    });
                 }
+                Expr::Call { callee, args } => {
+                    let callee = self.check_expr(expr)?;
+                    let mut args_ = Vec::new();
+                    for arg in args {
+                        args_.push(self.check_expr(&arg)?);
+                    }
 
-                return Ok(spanned!(
-                    TExpr::Call {
+                    return Ok(TExpr::Call {
                         callee: Box::new(callee),
                         args: args_,
-                    },
-                    expr.location.clone()
-                ));
+                    });
+                }
+                _ => unimplemented!(),
             }
-            _ => unimplemented!(),
-        }
+        })
     }
 
     fn check_stmt(&mut self, stmt: &Spanned<Stmt>) -> Return<Spanned<TStmt>> {
-        match &stmt.target {
-            Stmt::Expr(expr) => {
-                let expr = self.check_expr(expr)?;
-                Ok(spanned!(TStmt::Expr(expr.target), stmt.location.clone()))
-            }
-            Stmt::Return(expr) => {
-                if let Some(expr) = expr {
-                    let expr = self.check_expr(expr)?;
-                    return Ok(spanned!(TStmt::Return(Some(expr)), stmt.location.clone()));
+        stmt.clone().flat_map_spanned(|target| {
+            match target {
+                Stmt::Expr(expr) => {
+                    let expr = self.check_expr(&expr)?;
+                    Ok(TStmt::Expr(expr.target))
                 }
+                Stmt::Return(expr) => {
+                    if let Some(expr) = expr {
+                        let expr = self.check_expr(&expr)?;
+                        return Ok(TStmt::Return(Some(expr)));
+                    }
 
-                Ok(spanned!(TStmt::Return(None), stmt.location.clone()))
-            }
-            Stmt::Local { name, ty, value } => {
-                let ty = ty.clone().unwrap_or(Ty::Unknown);
-                let value = value.as_ref().map(|v| self.check_expr(v));
-
-                // Check if the local is not already defined
-                if self.ctx.get(name).is_some() {
-                    return Err(TypeckError::Redefinition {
-                        name: name.clone(),
-                        location: stmt.location.clone(),
-                    });
+                    Ok(TStmt::Return(None))
                 }
+                Stmt::Local { name, ty, value } => {
+                    let ty = ty.clone().unwrap_or(Ty::Unknown);
+                    let value = value.as_ref().map(|v| self.check_expr(v));
 
-                self.ctx.insert(name.clone(), ty.clone());
-                Ok(spanned!(
-                    TStmt::Local {
+                    // Check if the local is not already defined
+                    if self.ctx.get(&name).is_some() {
+                        return Err(TypeckError::Redefinition {
+                            name: name.clone(),
+                            location: stmt.location.clone(),
+                        });
+                    }
+
+                    self.ctx.insert(name.clone(), ty.clone());
+                    Ok(TStmt::Local {
                         name: name.clone(),
                         ty: Some(ty),
                         value: value.map(|v| v.unwrap()),
-                    },
-                    stmt.location.clone()
-                ))
-            }
-            Stmt::Assign { target, value } => {
-                let target_ty = self.infer_expr(target)?;
-                let value_ty = self.infer_expr(value)?;
-
-                if target_ty != value_ty {
-                    return Err(TypeckError::TypeMismatch {
-                        expected: target_ty,
-                        found: value_ty,
-                        location: value.location.clone(),
-                    });
+                    })
                 }
+                Stmt::Assign { target, value } => {
+                    let target_ty = self.infer_expr(&target)?;
+                    let value_ty = self.infer_expr(&value)?;
 
-                Ok(spanned!(
-                    TStmt::Assign {
-                        target: self.check_expr(target)?.target,
-                        value: self.check_expr(value)?,
-                    },
-                    stmt.location.clone()
-                ))
+                    if target_ty != value_ty {
+                        return Err(TypeckError::TypeMismatch {
+                            expected: target_ty,
+                            found: value_ty,
+                            location: value.location.clone(),
+                        });
+                    }
+
+                    Ok(TStmt::Assign {
+                        target: self.check_expr(&target)?.target,
+                        value: self.check_expr(&value)?,
+                    })
+                }
+                _ => unimplemented!(),
             }
-            _ => unimplemented!(),
-        }
+        })
     }
 
     fn check_block(&mut self, block: &Block) -> Return<Vec<Spanned<TStmt>>> {
@@ -355,28 +329,51 @@ impl<'cx> Typeck<'cx> {
         &mut self,
         stmt: &Spanned<ToplevelStmt>,
     ) -> Return<Spanned<TToplevelStmt>> {
-        match &stmt.target {
-            ToplevelStmt::Stmt(stmt) => {
-                let stmt = self.check_stmt(stmt)?;
-                Ok(spanned!(
-                    TToplevelStmt::Stmt(stmt.clone()),
-                    stmt.location.clone()
-                ))
+        stmt.clone().flat_map_spanned(|target| {
+            match target {
+                ToplevelStmt::Import { path, alias } => {
+                    Ok(TToplevelStmt::Import {
+                        path: path.clone(),
+                        alias: alias.clone(),
+                    })
+                }
+                ToplevelStmt::FunctionDecl {
+                    name,
+                    return_ty,
+                    params,
+                    body,
+                } => {
+                    let mut params_ = Vec::new();
+                    for (name, ty) in params {
+                        params_.push((name.clone(), ty.clone()));
+                    }
+
+                    let body = self.check_block(&body)?;
+                    Ok(TToplevelStmt::FunctionDecl {
+                        name: name.clone(),
+                        return_ty: return_ty.clone(),
+                        params: params_,
+                        body,
+                    })
+                }
+                _ => Err(TypeckError::UndefinedFunction {
+                    name: "function".to_string(),
+                    location: stmt.location.clone(),
+                }),
             }
-            _ => unimplemented!(),
-        }
+        })
     }
 
-    pub fn check(ast: Program) -> Return<TProgram> {
+    pub fn check(ast: Ast) -> Return<TypedAst> {
         let mut typeck = Typeck::new();
+        let toplevels = ast
+            .toplevels
+            .iter()
+            .map(|stmt| typeck.check_toplevel_stmt(stmt))
+            .collect::<Return<Vec<Spanned<TToplevelStmt>>>>()?;
 
-        let mut thir = Vec::new();
-        for stmt in ast {
-            let stmt = typeck.check_toplevel_stmt(&stmt)?;
-            thir.push(stmt);
-        }
-
-        Ok(thir)
+        let stmts = typeck.check_block(&ast.stmts)?;
+        Ok(TypedAst { toplevels, stmts })
     }
 }
 
@@ -393,13 +390,13 @@ pub mod typeck_tests {
     #[test]
     fn redefinition_of_local() {
         let mut typeck = Typeck::new();
-        let stmt = spanned!(
+        let stmt = spanned(
             Stmt::Local {
                 name: "x".to_string(),
                 ty: None,
                 value: None,
             },
-            SourceLoc::default()
+            SourceLoc::default(),
         );
 
         typeck.check_stmt(&stmt).unwrap();
@@ -411,19 +408,19 @@ pub mod typeck_tests {
     #[test]
     fn expr_with_int_float() {
         let mut typeck = Typeck::new();
-        let expr = spanned!(
+        let expr = spanned(
             Expr::BinOp(
-                Box::new(spanned!(
+                Box::new(spanned(
                     Expr::Literal(Literal::Int(42)),
-                    SourceLoc::default()
+                    SourceLoc::default(),
                 )),
                 BinOp::Add,
-                Box::new(spanned!(
+                Box::new(spanned(
                     Expr::Literal(Literal::Float(42.0)),
-                    SourceLoc::default()
-                ))
+                    SourceLoc::default(),
+                )),
             ),
-            SourceLoc::default()
+            SourceLoc::default(),
         );
 
         let typed = typeck.check_expr(&expr);
@@ -435,12 +432,12 @@ pub mod typeck_tests {
     #[test]
     fn tuple_holds_compatible_types() {
         let mut typeck = Typeck::new();
-        let expr = spanned!(
+        let expr = spanned(
             Expr::Tuple(vec![
-                spanned!(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
-                spanned!(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
+                spanned(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
+                spanned(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
             ]),
-            SourceLoc::default()
+            SourceLoc::default(),
         );
 
         let typed = typeck.check_expr(&expr);
@@ -450,12 +447,12 @@ pub mod typeck_tests {
     #[test]
     fn array_holds_compatible_types() {
         let mut typeck = Typeck::new();
-        let expr = spanned!(
+        let expr = spanned(
             Expr::Array(vec![
-                spanned!(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
-                spanned!(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
+                spanned(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
+                spanned(Expr::Literal(Literal::Int(42)), SourceLoc::default()),
             ]),
-            SourceLoc::default()
+            SourceLoc::default(),
         );
 
         let typed = typeck.check_expr(&expr);

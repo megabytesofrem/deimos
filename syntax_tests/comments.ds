@@ -2,3 +2,5 @@
 -- This is another single-line comment
 
 local foo = 1 -- this is a end of line comment
+
+-- Generate a function that takes a string, adds 3 exclamation points to the end, and returns the result

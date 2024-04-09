@@ -1,10 +1,9 @@
-use super::{Parser, Return, Token};
-
-use crate::spanned;
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{BinOp, TokenKind, UnOp};
-use crate::syntax::span::Spanned;
+use crate::syntax::span::{spanned, Spanned};
+
+use super::{Parser, Return, Token};
 
 fn strip_quotes(s: &str) -> &str {
     &s[1..s.len() - 1]
@@ -57,15 +56,15 @@ impl<'a> Parser<'a> {
             // Parse the right-hand side of the expression
             if op.is_op() {
                 let rhs = self.parse_expr_prec(op.get_precedence() + 1)?;
-                lhs = spanned!(
+                lhs = spanned(
                     Expr::BinOp(Box::new(lhs), tokenkind_to_binop(&op), Box::new(rhs)),
-                    location.clone()
+                    location.clone(),
                 );
             } else if op.is_unop() {
                 let rhs = self.parse_expr_prec(op.get_precedence())?;
-                lhs = spanned!(
+                lhs = spanned(
                     Expr::UnOp(tokenkind_to_unop(&op), Box::new(rhs)),
-                    location.clone()
+                    location.clone(),
                 );
             } else {
                 break;
@@ -82,19 +81,19 @@ impl<'a> Parser<'a> {
     fn parse_starting_ident(&mut self, name: String) -> Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.clone().location).unwrap_or_default();
 
-        if let Some(TokenKind::LParen) = self.peek().map(|t| &t.kind) {
+        if let Some(TokenKind::LParen) = self.peek().map(|t| t.kind) {
             // Function call
             todo!();
         }
 
-        if let Some(TokenKind::LSquare) = self.peek().map(|t| &t.kind) {
+        if let Some(TokenKind::LSquare) = self.peek().map(|t| t.kind) {
             // Array indexer
             let expr = self.parse_expr()?;
             return self.parse_array_indexer(expr.target);
         }
 
         // Just an identifier
-        Ok(spanned!(Expr::Variable(name), location))
+        Ok(spanned(Expr::Variable(name), location))
     }
 
     fn parse_literal(&mut self, token: &Token) -> Return<Literal> {
@@ -132,9 +131,9 @@ impl<'a> Parser<'a> {
         match &token.kind {
             TokenKind::Minus | TokenKind::Bang => {
                 let expr = self.parse_expr()?;
-                Ok(spanned!(
+                Ok(spanned(
                     Expr::UnOp(tokenkind_to_unop(&token.kind), Box::new(expr)),
-                    location
+                    location,
                 ))
             }
 
@@ -158,8 +157,9 @@ impl<'a> Parser<'a> {
             | TokenKind::KwTrue
             | TokenKind::KwFalse => {
                 let lit = self.parse_literal(&token)?;
-                Ok(spanned!(Expr::Literal(lit), location))
+                Ok(spanned(Expr::Literal(lit), location))
             }
+            TokenKind::Ident => self.parse_starting_ident(token.literal.to_string()),
 
             // Unexpected token, expected one of the above
             err_token => Err(SyntaxError::ExpectedOneOf {
@@ -192,12 +192,12 @@ impl<'a> Parser<'a> {
             },
         )?;
 
-        Ok(spanned!(
+        Ok(spanned(
             Expr::ArrayIndex {
                 array: Box::new(arr),
                 index: Box::new(index),
             },
-            location
+            location,
         ))
     }
 
@@ -232,9 +232,9 @@ impl<'a> Parser<'a> {
             },
         )?;
 
-        Ok(spanned!(
+        Ok(spanned(
             Expr::Array(elements.iter().map(|e| e.clone()).collect()),
-            location
+            location,
         ))
     }
 
@@ -269,9 +269,9 @@ impl<'a> Parser<'a> {
             SyntaxError::UnmatchedBrackets { location: loc },
         )?;
 
-        Ok(spanned!(
+        Ok(spanned(
             Expr::Tuple(elements.iter().map(|e| e.clone()).collect()),
-            location
+            location,
         ))
     }
 
@@ -306,11 +306,11 @@ impl<'a> Parser<'a> {
             SyntaxError::UnmatchedBrackets { location: loc },
         )?;
 
-        Ok(spanned!(
+        Ok(spanned(
             Expr::StructCons {
                 fields: fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             },
-            location
+            location,
         ))
     }
 }

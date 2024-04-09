@@ -54,12 +54,4 @@ impl<'a> Parser<'a> {
             location: peeked_token.location.clone(),
         })
     }
-
-    pub fn parse_cimport(&mut self) -> Return<ToplevelStmt> {
-        // cimport "foo_bar"
-        self.expect(TokenKind::KwCImport)?;
-        let header_path = self.expect(TokenKind::String)?.literal.to_string();
-
-        Ok(ToplevelStmt::CImport(header_path))
-    }
 }

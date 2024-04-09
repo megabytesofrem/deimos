@@ -15,11 +15,15 @@ pub enum Ty {
     Unknown,
 
     // Compound types
-    Function(Box<Ty>, Vec<Ty>), // return type, argument types
-    Pointer(Box<Ty>),           // *ty
+    Function(Box<Ty>, Vec<Ty>),
+    // return type, argument types
+    Pointer(Box<Ty>),
+    // *ty
     Array(Box<Ty>),
-    Tuple(Vec<Ty>),                    // (ty1, ty2, ...
-    Struct(String, Vec<(String, Ty)>), // name, fields
+    Tuple(Vec<Ty>),
+    // (ty1, ty2, ...
+    Struct(String, Vec<(String, Ty)>),
+    // name, fields
     UserDefined(String),
 }
 
@@ -29,6 +33,10 @@ impl Ty {
             self,
             Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::String | Ty::Void
         )
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        matches!(self, Ty::Pointer(_))
     }
 
     pub fn is_valid_index_type(&self) -> bool {
@@ -116,22 +124,23 @@ pub enum Stmt {
 }
 
 pub type Block = Vec<Spanned<Stmt>>;
-pub type Program = Vec<Spanned<ToplevelStmt>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
-    Stmt(Spanned<Stmt>),
-    CImport(String), // cimport stdio
-
-    Import {
-        path: Vec<String>,
-        alias: Option<String>,
-    },
+    Import { path: Vec<String>, alias: Option<String> },
 
     FunctionDecl {
         name: String,
-        return_ty: Ty,
         params: Vec<(String, Ty)>,
+        return_ty: Ty,
         body: Block,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ast {
+    pub comments: Vec<(SourceLoc, String)>,
+
+    pub toplevels: Vec<Spanned<ToplevelStmt>>,
+    pub stmts: Vec<Spanned<Stmt>>,
 }

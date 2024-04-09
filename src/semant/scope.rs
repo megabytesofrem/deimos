@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use crate::syntax::ast::Ty;
 
 #[derive(Debug, Clone)]
-pub struct ContextStack {
+pub struct ScopeStack {
     scopes: Vec<HashMap<String, Ty>>,
 }
 
-impl ContextStack {
+impl ScopeStack {
     pub fn new() -> Self {
-        ContextStack {
+        ScopeStack {
             scopes: vec![HashMap::new()],
         }
     }

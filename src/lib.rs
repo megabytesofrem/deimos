@@ -1,3 +1,3 @@
 pub mod codegen;
-pub mod passes;
+pub mod semant;
 pub mod syntax;
