@@ -37,25 +37,25 @@ pub enum TokenKind {
     #[token("!")]
     Bang,
     #[token("==")]
-    DoubleEqual,
+    DoubleEq,
     #[token("!=")]
-    BangEqual,
+    BangEq,
     #[token("<")]
     Less,
     #[token("<=")]
-    LessEqual,
+    LessEq,
     #[token(">")]
     Greater,
     #[token(">=")]
-    GreaterEqual,
+    GreaterEq,
     #[token("+=")]
-    PlusEqual,
+    PlusEq,
     #[token("-=")]
-    MinusEqual,
+    MinusEq,
     #[token("*=")]
-    StarEqual,
+    StarEq,
     #[token("/=")]
-    SlashEqual,
+    SlashEq,
 
     // Data types
     #[token("int")]

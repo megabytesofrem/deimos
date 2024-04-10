@@ -57,7 +57,7 @@ impl Compiler {
             Ty::Function(ret_ty, params) => self.build_function_pointer(*ret_ty, params),
             Ty::Array(ty) => format!("{}*", self.get_typename(*ty)),
             Ty::Pointer(ty) => format!("{}*", self.get_typename(*ty)),
-            Ty::UserDefined(name) => name,
+            Ty::Named(name) => name,
             _ => unimplemented!(),
         }
     }
@@ -265,7 +265,7 @@ mod tests {
         println!("{}", compiler.get_typename(ty.clone()));
         assert_eq!(compiler.get_typename(ty), "i32*");
 
-        let ty = Ty::Pointer(Box::new(Ty::UserDefined("Foo".to_string())));
+        let ty = Ty::Pointer(Box::new(Ty::Named("Foo".to_string())));
         println!("{}", compiler.get_typename(ty.clone()));
         assert_eq!(compiler.get_typename(ty), "Foo*");
     }

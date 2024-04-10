@@ -2,4 +2,12 @@ enum Color
     cRed,
     cGreen,
     cBlue,
+    cPink,
+end
+
+let FavoriteColor: Color = cPink
+
+-- return my favorite color
+function getFavoriteColor(): Color
+    return FavoriteColor
 end

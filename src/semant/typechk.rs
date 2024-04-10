@@ -278,7 +278,7 @@ impl<'cx> Typeck<'cx> {
 
                     Ok(TStmt::Return(None))
                 }
-                Stmt::VarDecl { name, ty, value } => {
+                Stmt::Let { name, ty, value } => {
                     let ty = ty.clone().unwrap_or(Ty::Unknown);
                     let value = value.as_ref().map(|v| self.check_expr(v));
 
@@ -471,7 +471,7 @@ pub mod typeck_tests {
     fn redefinition_of_var() {
         let mut typeck = Typeck::new();
         let stmt = spanned(
-            Stmt::VarDecl {
+            Stmt::Let {
                 name: "x".to_string(),
                 ty: None,
                 value: None,

@@ -23,7 +23,7 @@ pub enum Ty {
     Tuple(Vec<Ty>),
     Struct(String, Vec<(String, Ty)>),
     Enum(String, Vec<String>),
-    UserDefined(String),
+    Named(String),
 }
 
 impl Ty {
@@ -41,12 +41,12 @@ impl Ty {
     pub fn is_index_type(&self) -> bool {
         matches!(
             self,
-            Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::UserDefined(_)
+            Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::Named(_)
         )
     }
 
     pub fn is_indexable_type(&self) -> bool {
-        matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::UserDefined(_))
+        matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::Named(_))
     }
 }
 
@@ -90,7 +90,7 @@ pub enum Stmt {
     Expr(Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
 
-    VarDecl {
+    Let {
         name: String,
         ty: Option<Ty>,
         value: Option<Spanned<Expr>>,

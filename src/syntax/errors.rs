@@ -41,6 +41,6 @@ pub enum SyntaxError {
     #[error("Unmatched quotes in string literal")]
     UnmatchedQuotes { location: SourceLoc },
 
-    #[error("Unmatched brackets in expression")]
-    UnmatchedBrackets { location: SourceLoc },
+    #[error("Unbalanced brackets in expression")]
+    UnbalancedBrackets { location: SourceLoc },
 }
