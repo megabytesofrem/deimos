@@ -14,31 +14,31 @@ use super::scope::ScopeStack;
 use super::typed_ast::*;
 
 #[derive(Debug, Clone, Error)]
-pub enum TypeckError {
-    #[error("Type mismatch between {expected:?} and {found:?}")]
+pub enum TypechkError {
+    #[error("Type mismatch between '{expected:?}' and '{found:?}'")]
     TypeMismatch {
         expected: Ty,
         found: Ty,
         location: SourceLoc,
     },
 
-    #[error("Redefinition of local {name}")]
+    #[error("Redefinition of variable or type '{name}'")]
     Redefinition { name: String, location: SourceLoc },
 
-    #[error("Undefined local {name} being used before declaration")]
+    #[error("Undefined local '{name}' being used before declaration")]
     UndefinedLocal { name: String, location: SourceLoc },
 
-    #[error("Undefined function {name} being used before declaration")]
+    #[error("Undefined function '{name}' being used before declaration")]
     UndefinedFunction { name: String, location: SourceLoc },
 
-    #[error("Arity mismatch between {expected} and {found}")]
+    #[error("Arity mismatch between '{expected}' and '{found}'")]
     ArityMismatch {
         expected: usize,
         found: usize,
         location: SourceLoc,
     },
 
-    #[error("Return type mismatch between {expected:?} and {found:?}")]
+    #[error("Return type mismatch between '{expected:?}' and '{found:?}'")]
     ReturnTypeMismatch {
         expected: Ty,
         found: Ty,
@@ -47,13 +47,15 @@ pub enum TypeckError {
 }
 
 // Holds the type that is returned from the type checker
-type Return<T> = Result<T, TypeckError>;
+type Return<T> = Result<T, TypechkError>;
 
 // Type checker pass
 #[derive(Debug, Clone)]
 pub struct Typeck<'cx> {
     ctx: ScopeStack,
     marker: std::marker::PhantomData<&'cx ()>,
+
+    errors: Vec<TypechkError>,
 }
 
 impl<'cx> Typeck<'cx> {
@@ -61,6 +63,7 @@ impl<'cx> Typeck<'cx> {
         Typeck {
             ctx: ScopeStack::new(),
             marker: std::marker::PhantomData,
+            errors: Vec::new(),
         }
     }
 
@@ -71,7 +74,7 @@ impl<'cx> Typeck<'cx> {
         let rhs_ty = self.infer_expr(rhs)?;
 
         if lhs_ty != rhs_ty {
-            return Err(TypeckError::TypeMismatch {
+            return Err(TypechkError::TypeMismatch {
                 expected: lhs_ty,
                 found: rhs_ty,
                 location: lhs.location.clone(),
@@ -81,7 +84,7 @@ impl<'cx> Typeck<'cx> {
         match op {
             BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
                 if lhs_ty != Ty::Int && rhs_ty != Ty::Float && rhs_ty != Ty::Double {
-                    return Err(TypeckError::TypeMismatch {
+                    return Err(TypechkError::TypeMismatch {
                         expected: Ty::Int,
                         found: lhs_ty,
                         location: lhs.location.clone(),
@@ -111,7 +114,7 @@ impl<'cx> Typeck<'cx> {
         elems.iter().skip(1).try_for_each(|elem| {
             let ty = self.infer_expr(elem)?;
             if ty != elem_ty {
-                return Err(TypeckError::TypeMismatch {
+                return Err(TypechkError::TypeMismatch {
                     expected: elem_ty.clone(),
                     found: ty,
                     location: elem.location.clone(),
@@ -141,8 +144,8 @@ impl<'cx> Typeck<'cx> {
         let index_ty = self.infer_expr(index)?;
 
         // Check if `index_ty` is a valid index type or not
-        if !index_ty.is_valid_index_type() {
-            return Err(TypeckError::TypeMismatch {
+        if !index_ty.is_index_type() {
+            return Err(TypechkError::TypeMismatch {
                 expected: Ty::Int,
                 found: index_ty,
                 location: index.location.clone(),
@@ -151,7 +154,7 @@ impl<'cx> Typeck<'cx> {
 
         match indexable_ty {
             Ty::Array(ty) => Ok(*ty),
-            _ => Err(TypeckError::TypeMismatch {
+            _ => Err(TypechkError::TypeMismatch {
                 expected: Ty::Array(Box::new(Ty::Unknown)),
                 found: indexable_ty,
                 location: indexable.location.clone(),
@@ -179,7 +182,7 @@ impl<'cx> Typeck<'cx> {
         self.ctx
             .get(name)
             .cloned()
-            .ok_or_else(|| TypeckError::UndefinedLocal {
+            .ok_or_else(|| TypechkError::UndefinedLocal {
                 name: name.to_string(),
                 location,
             })
@@ -206,7 +209,7 @@ impl<'cx> Typeck<'cx> {
                 Expr::Variable(name) => {
                     let ty2 = self.check_variable(&name, expr.location.clone())?;
                     if ty != ty2 {
-                        return Err(TypeckError::TypeMismatch {
+                        return Err(TypechkError::TypeMismatch {
                             expected: ty,
                             found: ty2,
                             location: expr.location.clone(),
@@ -275,20 +278,20 @@ impl<'cx> Typeck<'cx> {
 
                     Ok(TStmt::Return(None))
                 }
-                Stmt::Local { name, ty, value } => {
+                Stmt::VarDecl { name, ty, value } => {
                     let ty = ty.clone().unwrap_or(Ty::Unknown);
                     let value = value.as_ref().map(|v| self.check_expr(v));
 
                     // Check if the local is not already defined
                     if self.ctx.get(&name).is_some() {
-                        return Err(TypeckError::Redefinition {
+                        return Err(TypechkError::Redefinition {
                             name: name.clone(),
                             location: stmt.location.clone(),
                         });
                     }
 
                     self.ctx.insert(name.clone(), ty.clone());
-                    Ok(TStmt::Local {
+                    Ok(TStmt::VarDecl {
                         name: name.clone(),
                         ty: Some(ty),
                         value: value.map(|v| v.unwrap()),
@@ -299,7 +302,7 @@ impl<'cx> Typeck<'cx> {
                     let value_ty = self.infer_expr(&value)?;
 
                     if target_ty != value_ty {
-                        return Err(TypeckError::TypeMismatch {
+                        return Err(TypechkError::TypeMismatch {
                             expected: target_ty,
                             found: value_ty,
                             location: value.location.clone(),
@@ -325,6 +328,90 @@ impl<'cx> Typeck<'cx> {
         Ok(block_)
     }
 
+    fn check_struct_declare(
+        &mut self,
+        name: &str,
+        fields: &[(String, Ty)],
+    ) -> Return<TToplevelStmt> {
+        // Check if the struct is not already defined
+        if self.ctx.get(name).is_some() {
+            return Err(TypechkError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
+        }
+
+        // Insert the struct into the context
+        self.ctx.insert(name.to_string(), Ty::Struct(name.to_string(), fields.to_vec()));
+
+        Ok(TToplevelStmt::StructDecl {
+            name: name.to_string(),
+            fields: fields.to_vec(),
+        })
+    }
+
+    fn check_enum_declare(
+        &mut self,
+        name: &str,
+        fields: &[String],
+    ) -> Return<TToplevelStmt> {
+        // Check if the enum is not already defined
+        if self.ctx.get(name).is_some() {
+            return Err(TypechkError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
+        }
+
+        // Insert the enum into the context
+        self.ctx.insert(name.to_string(), Ty::Enum(name.to_string(), fields.to_vec()));
+
+        // Insert the enum fields into the context
+        for field in fields {
+            self.ctx.insert(field.clone(), Ty::Int)
+        }
+
+        Ok(TToplevelStmt::EnumDecl {
+            name: name.to_string(),
+            fields: fields.to_vec(),
+        })
+    }
+
+    fn check_function_declare(
+        &mut self,
+        name: &str,
+        return_ty: Ty,
+        params: &[(String, Ty)],
+        body: &Block,
+    ) -> Return<TToplevelStmt> {
+        // Check if the function is not already defined
+        if self.ctx.get(name).is_some() {
+            return Err(TypechkError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
+        }
+
+        // Insert the function into the context
+        let param_tys = params.iter().map(|(_, ty)| ty.clone()).collect();
+        self.ctx.insert(name.to_string(), Ty::Function(Box::new(return_ty.clone()), param_tys));
+
+        // Insert the function parameters into the context
+        for (name, ty) in params {
+            self.ctx.insert(name.clone(), ty.clone());
+        }
+
+        // Check the function body
+        let body = self.check_block(body)?;
+
+        Ok(TToplevelStmt::FunctionDecl {
+            name: name.to_string(),
+            return_ty,
+            params: params.to_vec(),
+            body,
+        })
+    }
+
     fn check_toplevel_stmt(
         &mut self,
         stmt: &Spanned<ToplevelStmt>,
@@ -337,43 +424,36 @@ impl<'cx> Typeck<'cx> {
                         alias: alias.clone(),
                     })
                 }
+                ToplevelStmt::StructDecl { name, fields } => {
+                    self.check_struct_declare(&name, &fields)
+                }
+                ToplevelStmt::EnumDecl { name, fields } => {
+                    self.check_enum_declare(&name, &fields)
+                }
                 ToplevelStmt::FunctionDecl {
                     name,
                     return_ty,
                     params,
                     body,
-                } => {
-                    let mut params_ = Vec::new();
-                    for (name, ty) in params {
-                        params_.push((name.clone(), ty.clone()));
-                    }
-
-                    let body = self.check_block(&body)?;
-                    Ok(TToplevelStmt::FunctionDecl {
-                        name: name.clone(),
-                        return_ty: return_ty.clone(),
-                        params: params_,
-                        body,
-                    })
+                } => self.check_function_declare(&name, return_ty.clone(), &params, &body),
+                ToplevelStmt::Stmt(stmt) => {
+                    let stmt = self.check_stmt(&stmt)?;
+                    Ok(TToplevelStmt::Stmt(stmt))
                 }
-                _ => Err(TypeckError::UndefinedFunction {
-                    name: "function".to_string(),
-                    location: stmt.location.clone(),
-                }),
+                _ => unimplemented!(),
             }
         })
     }
 
     pub fn check(ast: Ast) -> Return<TypedAst> {
         let mut typeck = Typeck::new();
-        let toplevels = ast
-            .toplevels
+        let nodes = ast
+            .nodes
             .iter()
             .map(|stmt| typeck.check_toplevel_stmt(stmt))
             .collect::<Return<Vec<Spanned<TToplevelStmt>>>>()?;
 
-        let stmts = typeck.check_block(&ast.stmts)?;
-        Ok(TypedAst { toplevels, stmts })
+        Ok(TypedAst { nodes })
     }
 }
 
@@ -388,10 +468,10 @@ pub mod typeck_tests {
     use super::*;
 
     #[test]
-    fn redefinition_of_local() {
+    fn redefinition_of_var() {
         let mut typeck = Typeck::new();
         let stmt = spanned(
-            Stmt::Local {
+            Stmt::VarDecl {
                 name: "x".to_string(),
                 ty: None,
                 value: None,

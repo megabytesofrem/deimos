@@ -14,16 +14,15 @@ pub enum Ty {
     Any,
     Unknown,
 
-    // Compound types
     Function(Box<Ty>, Vec<Ty>),
-    // return type, argument types
+    // Arrays decay into pointers ala C
     Pointer(Box<Ty>),
-    // *ty
     Array(Box<Ty>),
+
+    // (ty1, ty2, ...)
     Tuple(Vec<Ty>),
-    // (ty1, ty2, ...
     Struct(String, Vec<(String, Ty)>),
-    // name, fields
+    Enum(String, Vec<String>),
     UserDefined(String),
 }
 
@@ -39,21 +38,21 @@ impl Ty {
         matches!(self, Ty::Pointer(_))
     }
 
-    pub fn is_valid_index_type(&self) -> bool {
+    pub fn is_index_type(&self) -> bool {
         matches!(
             self,
             Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::UserDefined(_)
         )
     }
 
-    pub fn is_valid_indexable_type(&self) -> bool {
+    pub fn is_indexable_type(&self) -> bool {
         matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::UserDefined(_))
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
-    Int(i64),
+    Int(i32),
     Float(f32),
     Double(f64),
     Bool(bool),
@@ -91,16 +90,10 @@ pub enum Stmt {
     Expr(Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
 
-    Local {
+    VarDecl {
         name: String,
         ty: Option<Ty>,
         value: Option<Spanned<Expr>>,
-    },
-
-    // TODO: Should this be moved to toplevel?
-    StructDecl {
-        name: String,
-        fields: Vec<(String, Ty)>,
     },
     Assign {
         target: Spanned<Expr>,
@@ -128,6 +121,17 @@ pub type Block = Vec<Spanned<Stmt>>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
     Import { path: Vec<String>, alias: Option<String> },
+    Stmt(Spanned<Stmt>),
+
+    EnumDecl {
+        name: String,
+        fields: Vec<String>,
+    },
+
+    StructDecl {
+        name: String,
+        fields: Vec<(String, Ty)>,
+    },
 
     FunctionDecl {
         name: String,
@@ -140,7 +144,5 @@ pub enum ToplevelStmt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     pub comments: Vec<(SourceLoc, String)>,
-
-    pub toplevels: Vec<Spanned<ToplevelStmt>>,
-    pub stmts: Vec<Spanned<Stmt>>,
+    pub nodes: Vec<Spanned<ToplevelStmt>>,
 }

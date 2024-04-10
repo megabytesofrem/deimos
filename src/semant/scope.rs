@@ -26,6 +26,10 @@ impl ScopeStack {
         self.scopes.last_mut().unwrap().insert(name, ty);
     }
 
+    pub fn remove(&mut self, name: &str) {
+        self.scopes.last_mut().unwrap().remove(name);
+    }
+
     pub fn get(&self, name: &str) -> Option<&Ty> {
         for scope in self.scopes.iter().rev() {
             if let Some(ty) = scope.get(name) {

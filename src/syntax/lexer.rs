@@ -1,5 +1,6 @@
-use logos::{Logos, SpannedIter};
 use std::iter::Peekable;
+
+use logos::{Logos, SpannedIter};
 
 pub type SourceLoc = std::ops::Range<usize>;
 
@@ -47,12 +48,22 @@ pub enum TokenKind {
     Greater,
     #[token(">=")]
     GreaterEqual,
+    #[token("+=")]
+    PlusEqual,
+    #[token("-=")]
+    MinusEqual,
+    #[token("*=")]
+    StarEqual,
+    #[token("/=")]
+    SlashEqual,
 
     // Data types
     #[token("int")]
     Int,
     #[token("float")]
     Float,
+    #[token("double")]
+    Double,
     #[token("bool")]
     Bool,
     #[token("string")]
@@ -61,13 +72,15 @@ pub enum TokenKind {
     Void,
 
     // Keywords
-    #[token("local")]
-    KwLocal,
+    #[token("let")]
+    KwLet,
     #[token("struct")]
     KwStruct,
+    #[token("enum")]
+    KwEnum,
     #[token("function")]
     KwFunction,
-    #[token("cimport")]
+    #[token("c_import")]
     KwCImport,
     #[token("import")]
     KwImport,
@@ -89,12 +102,16 @@ pub enum TokenKind {
     KwEnd,
     #[token("break")]
     KwBreak,
+    #[token("return")]
+    KwReturn,
+    #[token("and")]
+    KwAnd,
+    #[token("or")]
+    KwOr,
     #[token("true")]
     KwTrue,
     #[token("false")]
     KwFalse,
-    #[token("return")]
-    KwReturn,
 
     // Literals
     #[regex(r"[_a-zA-Z][_0-9a-zA-Z]*")]
@@ -178,10 +195,10 @@ impl Token<'_> {
         matches!(self.kind, TokenKind::Integer | TokenKind::HexInteger)
     }
 
-    pub fn to_int_literal(&self) -> i64 {
+    pub fn to_int_literal(&self) -> i32 {
         match self.kind {
             TokenKind::Integer => self.literal.parse().unwrap(),
-            TokenKind::HexInteger => i64::from_str_radix(&self.literal[2..], 16).unwrap(),
+            TokenKind::HexInteger => i32::from_str_radix(&self.literal[2..], 16).unwrap(),
             _ => panic!("Not an integer literal"),
         }
     }

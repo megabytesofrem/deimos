@@ -25,6 +25,7 @@ impl TokenKind {
             | TokenKind::Star
             | TokenKind::Slash
             | TokenKind::Equal
+            | TokenKind::DoubleEqual
             | TokenKind::BangEqual
             | TokenKind::Less
             | TokenKind::LessEqual
@@ -45,11 +46,17 @@ impl TokenKind {
         match self {
             TokenKind::Plus | TokenKind::Minus => 10,
             TokenKind::Star | TokenKind::Slash => 20,
-            TokenKind::Equal | TokenKind::BangEqual => 5,
+            TokenKind::DoubleEqual | TokenKind::BangEqual => 5,
             TokenKind::Less
             | TokenKind::LessEqual
             | TokenKind::Greater
-            | TokenKind::GreaterEqual => 5,
+            | TokenKind::GreaterEqual
+            | TokenKind::PlusEqual
+            | TokenKind::MinusEqual
+            | TokenKind::StarEqual
+            | TokenKind::SlashEqual => 5,
+            TokenKind::Bang | TokenKind::KwAnd | TokenKind::KwOr => 2,
+
 
             // Either not a binary operator or not implemented yet
             _ => 0,
@@ -106,11 +113,13 @@ impl<'cx> Parser<'cx> {
     }
 
     fn parse_type(&mut self) -> Return<Ty> {
+        let prev_if_any = self.peek();
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         match token.kind {
             TokenKind::Void => Ok(Ty::Void),
             TokenKind::Int => Ok(Ty::Int),
             TokenKind::Float => Ok(Ty::Float),
+            TokenKind::Double => Ok(Ty::Double),
             TokenKind::String => Ok(Ty::String),
             TokenKind::Bool => Ok(Ty::Bool),
             TokenKind::Star => {
@@ -128,6 +137,10 @@ impl<'cx> Parser<'cx> {
                 )?;
                 let ty = self.parse_type()?;
                 Ok(Ty::Array(Box::new(ty)))
+            }
+            TokenKind::LParen => {
+                // (t1,t2,..)
+                todo!("Tuple types are not implemented yet")
             }
             TokenKind::Ident => {
                 // User defined type
@@ -202,6 +215,8 @@ impl<'cx> Parser<'cx> {
         match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwImport => self.parse_import(),
+                TokenKind::KwStruct => self.parse_struct_declare(),
+                TokenKind::KwEnum => self.parse_enum_declare(),
                 TokenKind::KwFunction => self.parse_function_declare(),
                 _ => Err(SyntaxError::UnexpectedToken {
                     token: token.kind.clone(),
@@ -216,8 +231,7 @@ impl<'cx> Parser<'cx> {
     pub fn parse_stmt(&mut self) -> Return<Spanned<Stmt>> {
         match self.peek() {
             Some(token) => match token.kind {
-                TokenKind::KwLocal => self.parse_local_declare(),
-                TokenKind::KwStruct => self.parse_struct_declare(),
+                TokenKind::KwLet => self.parse_var_declare(),
                 TokenKind::Ident => self.parse_assignment(),
                 TokenKind::KwIf => self.parse_if_stmt(),
                 TokenKind::KwFor => self.parse_for_loop(),
@@ -235,9 +249,9 @@ impl<'cx> Parser<'cx> {
     }
 
     // Statements
-    fn parse_local_declare(&mut self) -> Return<Spanned<Stmt>> {
-        // local ident:type = expr
-        let t = self.expect(TokenKind::KwLocal)?;
+    fn parse_var_declare(&mut self) -> Return<Spanned<Stmt>> {
+        // let ident:type = expr
+        let t = self.expect(TokenKind::KwLet)?;
         let ident = self.expect(TokenKind::Ident)?;
         self.expect(TokenKind::Colon)?;
         let ty = self.parse_type()?;
@@ -246,7 +260,7 @@ impl<'cx> Parser<'cx> {
         let expr = self.parse_expr()?;
 
         Ok(spanned(
-            Stmt::Local {
+            Stmt::VarDecl {
                 name: ident.literal.to_string(),
                 ty: Some(ty),
                 value: Some(expr),
@@ -355,37 +369,66 @@ impl<'cx> Parser<'cx> {
     }
 
     // NOTE: Maybe come up with a better syntax for this?
-    fn parse_struct_declare(&mut self) -> Return<Spanned<Stmt>> {
-        // struct name = { field* }
+    fn parse_struct_declare(&mut self) -> Return<ToplevelStmt> {
+        // struct name
+        //  field*
+        // end
         let t = self.expect(TokenKind::KwStruct)?;
         let name = self.expect(TokenKind::Ident)?;
-        self.expect(TokenKind::Equal)?;
 
-        self.expect(TokenKind::LCurly)?;
         let mut fields = Vec::new();
 
-        while let Some(_token) = self.peek() {
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::KwEnd {
+                self.expect(TokenKind::KwEnd)?;
+                break;
+            }
             let ident = self.expect(TokenKind::Ident)?;
             self.expect(TokenKind::Colon)?;
             let ty = self.parse_type()?;
             fields.push((ident.literal.to_string(), ty));
-
             if let Some(token) = self.peek() {
-                if token.kind == TokenKind::RCurly {
-                    break;
+                if token.kind != TokenKind::KwEnd {
+                    self.expect(TokenKind::Comma)?;
                 }
-                self.expect(TokenKind::Comma)?;
             }
         }
 
-        self.expect(TokenKind::RCurly)?;
-        Ok(spanned(
-            Stmt::StructDecl {
-                name: name.literal.to_string(),
-                fields,
-            },
-            t.location,
-        ))
+        Ok(ToplevelStmt::StructDecl {
+            name: name.literal.to_string(),
+            fields,
+        })
+    }
+
+    fn parse_enum_declare(&mut self) -> Return<ToplevelStmt> {
+        // TODO: Make these namespaced one day
+
+        // enum name
+        //  field*
+        // end
+        let t = self.expect(TokenKind::KwEnum)?;
+        let name = self.expect(TokenKind::Ident)?;
+
+        let mut fields = Vec::new();
+
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::KwEnd {
+                self.expect(TokenKind::KwEnd)?;
+                break;
+            }
+            let ident = self.expect(TokenKind::Ident)?;
+            fields.push((ident.literal.to_string()));
+            if let Some(token) = self.peek() {
+                if token.kind != TokenKind::KwEnd {
+                    self.expect(TokenKind::Comma)?;
+                }
+            }
+        }
+
+        Ok(ToplevelStmt::EnumDecl {
+            name: name.literal.to_string(),
+            fields,
+        })
     }
 
     fn parse_function_declare(&mut self) -> Return<ToplevelStmt> {
@@ -436,13 +479,12 @@ impl<'cx> Parser<'cx> {
     }
 
     pub fn parse(src: &'cx str) -> Return<'cx, Ast> {
-        // node: (function_declare | stmt)
+        // node: (comment | function_declare | stmt)
         // nodes: node*
         let mut parser = Parser::new(src);
 
         let mut comment_nodes: Vec<(SourceLoc, String)> = Vec::new();
-        let mut toplevels: Vec<Spanned<ToplevelStmt>> = Vec::new();
-        let mut stmts: Vec<Spanned<Stmt>> = Vec::new();
+        let mut nodes: Vec<Spanned<ToplevelStmt>> = Vec::new();
 
         while let Some(token) = parser.peek() {
             match token.kind {
@@ -454,31 +496,30 @@ impl<'cx> Parser<'cx> {
                     // TODO: fix the below code giving me a borrow checker error
                     //comment_nodes.push((location, token.literal.clone().to_string()));
                 }
-                TokenKind::KwFunction => {
+                TokenKind::KwFunction | TokenKind::KwStruct | TokenKind::KwEnum => {
                     // Functions are top-level nodes
                     let location = token.location.clone();
-                    toplevels.push(spanned(parser.parse_function_declare()?, location));
+                    nodes.push(spanned(parser.parse_toplevel_stmt()?, location));
                 }
 
                 // Statements can exist outside a function or block
                 _ => {
                     let location = token.location.clone();
-                    stmts.push(spanned(parser.parse_stmt()?.target, location));
+                    nodes.push(spanned(ToplevelStmt::Stmt(parser.parse_stmt()?), location));
                 }
             }
         }
 
         Ok(Ast {
             comments: comment_nodes,
-            toplevels,
-            stmts,
+            nodes,
         })
     }
 }
 
 // Tests
 #[cfg(test)]
-mod parser_tests {
+mod tests {
     use crate::syntax::parse::Parser;
 
     #[test]

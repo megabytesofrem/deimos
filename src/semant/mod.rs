@@ -1,4 +1,6 @@
 pub mod scope;
+pub mod typechk;
+pub mod typed_ast;
 
-pub mod typeck;
-pub mod typed_ast; // Lower to a typed AST
+// Desugaring pass
+pub mod desugar;

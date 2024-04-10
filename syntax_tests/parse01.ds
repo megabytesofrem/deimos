@@ -1,6 +1,6 @@
-local x:int = 1
+let x:int = 1
 
 function foo()
-    local z:int = 3 + 2 * y
+    let z:int = 3 + 2 * y
     return z
 end

@@ -15,7 +15,7 @@ fn tokenkind_to_binop(kind: &TokenKind) -> BinOp {
         TokenKind::Minus => BinOp::Sub,
         TokenKind::Star => BinOp::Mul,
         TokenKind::Slash => BinOp::Div,
-        TokenKind::Equal => BinOp::Eq,
+        TokenKind::DoubleEqual => BinOp::Eq,
         TokenKind::BangEqual => BinOp::BangEq,
         TokenKind::Less => BinOp::Less,
         TokenKind::LessEqual => BinOp::LessEq,

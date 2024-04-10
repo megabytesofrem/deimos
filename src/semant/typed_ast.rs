@@ -40,14 +40,10 @@ pub enum TStmt {
     Expr(TExpr),
     Return(Option<Spanned<TExpr>>),
 
-    Local {
+    VarDecl {
         name: String,
         ty: Option<Ty>,
         value: Option<Spanned<TExpr>>,
-    },
-    StructDecl {
-        name: String,
-        fields: Vec<(String, Ty)>,
     },
     Assign {
         target: TExpr,
@@ -75,6 +71,17 @@ pub type TBlock = Vec<Spanned<TStmt>>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum TToplevelStmt {
     Import { path: Vec<String>, alias: Option<String> },
+    Stmt(Spanned<TStmt>),
+
+    EnumDecl {
+        name: String,
+        fields: Vec<String>,
+    },
+
+    StructDecl {
+        name: String,
+        fields: Vec<(String, Ty)>,
+    },
 
     FunctionDecl {
         name: String,
@@ -86,6 +93,5 @@ pub enum TToplevelStmt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedAst {
-    pub toplevels: Vec<Spanned<TToplevelStmt>>,
-    pub stmts: Vec<Spanned<TStmt>>,
+    pub nodes: Vec<Spanned<TToplevelStmt>>,
 }
