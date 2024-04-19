@@ -4,25 +4,48 @@ use super::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Numeric {
+    I16,
+    I32,
+    I64,
+    U16,
+    U32,
+    U64,
+    F32,
+    F64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
-    Int,
-    Float,
-    Double,
+    Numeric(Numeric),
     Bool,
+    Char,
     String,
     Void,
-    Any,
     Unknown,
 
     Function(Box<Ty>, Vec<Ty>),
+
     // Arrays decay into pointers ala C
     Pointer(Box<Ty>),
     Array(Box<Ty>),
 
     // (ty1, ty2, ...)
     Tuple(Vec<Ty>),
-    Struct(String, Vec<(String, Ty)>),
-    Enum(String, Vec<String>),
+
+    // Optional types are implemented at a compiler level
+    Optional(Box<Ty>),
+
+    Struct {
+        name: String,
+        fields: Vec<(String, Ty)>,
+    },
+
+    Enum {
+        name: String,
+        fields: Vec<String>,
+    },
+
     UserDefined(String),
 }
 
@@ -30,8 +53,12 @@ impl Ty {
     pub fn is_primitive(&self) -> bool {
         matches!(
             self,
-            Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::String | Ty::Void
+            Ty::Numeric(_) | Ty::Bool | Ty::Char | Ty::String
         )
+    }
+
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, Ty::Numeric(_))
     }
 
     pub fn is_pointer(&self) -> bool {
@@ -39,10 +66,7 @@ impl Ty {
     }
 
     pub fn is_index_type(&self) -> bool {
-        matches!(
-            self,
-            Ty::Int | Ty::Float | Ty::Double | Ty::Bool | Ty::UserDefined(_)
-        )
+        matches!(self, Ty::Numeric(_) | Ty::UserDefined(_))
     }
 
     pub fn is_indexable_type(&self) -> bool {
@@ -90,7 +114,7 @@ pub enum Stmt {
     Expr(Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
 
-    VarDecl {
+    Let {
         name: String,
         ty: Option<Ty>,
         value: Option<Spanned<Expr>>,
@@ -121,6 +145,7 @@ pub type Block = Vec<Spanned<Stmt>>;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
     Import { path: Vec<String>, alias: Option<String> },
+
     Stmt(Spanned<Stmt>),
 
     EnumDecl {

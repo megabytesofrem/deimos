@@ -1,7 +1,4 @@
-//
-// Typed AST transformation pass
-//
-
+/// Typed AST representation
 use crate::syntax::ast::{Literal, Ty};
 use crate::syntax::lexer::{BinOp, UnOp};
 use crate::syntax::span::Spanned;
@@ -89,6 +86,7 @@ pub enum TToplevelStmt {
         return_ty: Ty,
         body: TBlock,
     },
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq)]

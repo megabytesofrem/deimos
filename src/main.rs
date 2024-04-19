@@ -1,7 +1,7 @@
-use deimos::codegen::Compiler;
-use deimos::semant::typechk::{TypechkError, Typeck};
-use deimos::syntax::errors::SyntaxError;
-use deimos::syntax::parse::Parser;
+use std::error::Error;
+
+use deimos::parser::Parser;
+use deimos::semant::typechk::Typeck;
 
 fn main() {
     println!("Deimos compiler v0.0.0.1");
@@ -9,42 +9,32 @@ fn main() {
     println!("This compiler is a stage1 compiler, only used for bootstrapping.");
     println!("----------------------------------------------------------------");
 
-    let src = std::fs::read_to_string("syntax_tests/test.ds").expect("Failed to read file");
-    drive(&src);
+    let src = std::fs::read_to_string("test/ksp.dms").expect("Failed to read file");
+
+    drive(&src).unwrap_or_else(|e| {
+        eprintln!("{}", e);
+    });
 }
 
-fn drive(src: &str) {
-    let mut syntax_errors: Vec<SyntaxError> = Vec::new();
-    let mut tc_errors: Vec<TypechkError> = Vec::new();
-
-    let ast = Parser::parse(src);
-    if ast.is_err() {
-        syntax_errors.push(ast.clone().err().unwrap());
+fn print_errors(errors: Vec<impl Error>) {
+    for e in errors {
+        eprintln!("{}", e);
     }
+}
 
-    let typed_ast = Typeck::check(ast.unwrap());
-    if typed_ast.is_err() {
-        tc_errors.push(typed_ast.clone().err().unwrap());
-    }
+fn drive(src: &str) -> anyhow::Result<()> {
+    let ast = Parser::parse(src).map_err(|e| {
+        print_errors(e);
+        anyhow::anyhow!("Parsing failed")
+    })?;
 
-    if !syntax_errors.is_empty() {
-        for error in syntax_errors {
-            println!("SyntaxError: {}", error);
-        }
-    }
+    let typed_ast = Typeck::check(ast).map_err(|e| {
+        print_errors(e);
+        anyhow::anyhow!("Type checking failed")
+    })?;
 
-    if !tc_errors.is_empty() {
-        for error in tc_errors {
-            println!("TypeckError: {}", error);
-        }
-    }
+    println!("Typecheck successful");
+    println!("{:#?}", typed_ast);
 
-    if let Ok(ast) = typed_ast {
-        let compiler = Compiler::compile(&ast);
-
-        println!("Successfully compiled!");
-        println!("Output: ");
-        println!("----------------------------------------------------------------");
-        println!("{}", compiler.code);
-    }
+    Ok(())
 }

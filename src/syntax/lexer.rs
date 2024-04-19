@@ -1,7 +1,9 @@
+//! Lexical analysis pass using `logos` crate
 use std::iter::Peekable;
 
 use logos::{Logos, SpannedIter};
 
+/// Report locations in the source code
 pub type SourceLoc = std::ops::Range<usize>;
 
 #[derive(Debug, Clone, PartialEq, Logos)]
@@ -30,6 +32,8 @@ pub enum TokenKind {
     Dot,
     #[token(",")]
     Comma,
+    #[token("?")]
+    Question,
     #[token(":")]
     Colon,
     #[token("=")]
@@ -37,39 +41,25 @@ pub enum TokenKind {
     #[token("!")]
     Bang,
     #[token("==")]
-    DoubleEqual,
+    DoubleEq,
     #[token("!=")]
-    BangEqual,
+    BangEq,
     #[token("<")]
     Less,
     #[token("<=")]
-    LessEqual,
+    LessEq,
     #[token(">")]
     Greater,
     #[token(">=")]
-    GreaterEqual,
+    GreaterEq,
     #[token("+=")]
-    PlusEqual,
+    PlusEq,
     #[token("-=")]
-    MinusEqual,
+    MinusEq,
     #[token("*=")]
-    StarEqual,
+    StarEq,
     #[token("/=")]
-    SlashEqual,
-
-    // Data types
-    #[token("int")]
-    Int,
-    #[token("float")]
-    Float,
-    #[token("double")]
-    Double,
-    #[token("bool")]
-    Bool,
-    #[token("string")]
-    String,
-    #[token("void")]
-    Void,
+    SlashEq,
 
     // Keywords
     #[token("let")]
@@ -118,6 +108,8 @@ pub enum TokenKind {
     Ident,
     #[regex(r"[-]?[0-9][0-9]*")]
     Integer,
+    #[regex(r"[-]?[0-9]+\.[0-9]+")]
+    Float,
     #[regex(r"0[xX][0-9a-fA-F]+")]
     HexInteger,
     #[regex(r#""(\\[\\"]|[^"])*""#)]
@@ -207,6 +199,7 @@ impl Token<'_> {
 // Alias type for TokenIter to be more typing-friendly
 pub type LexerIter<'a> = Peekable<Box<TokenIter<'a>>>;
 
+#[derive(Clone)]
 pub struct TokenIter<'a> {
     inner: SpannedIter<'a, TokenKind>,
     src: &'a str,
@@ -230,7 +223,7 @@ impl<'a> Iterator for TokenIter<'a> {
 }
 
 /// Return an iterator over the tokens in the source string
-pub fn lex_tokens<'a>(src: &'a str) -> LexerIter<'a> {
+pub fn lex_tokens(src: &str) -> LexerIter {
     let iter = TokenIter {
         inner: TokenKind::lexer(src).spanned(),
         src,

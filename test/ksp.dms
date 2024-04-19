@@ -1,0 +1,14 @@
+-- import math
+
+-- KSP delta V calculator
+let isp: f32 = 390 -- LV-909 Terrier 
+let V_e: f32 = 9.8 * isp -- exhaust velocity
+
+let m0: f32 = 10 -- initial mass
+let m1: f32 = 5 -- final mass
+-- dV = V_e * ln(m0 / m1)
+
+function calc_dV(m0: f32, m1: f32): f32
+    --return V_e * log(m0 / m1)
+end
+

@@ -6,10 +6,12 @@ pub struct Spanned<T> {
     pub location: SourceLoc,
 }
 
+
 pub fn spanned<T>(target: T, location: SourceLoc) -> Spanned<T> {
     Spanned { target, location }
 }
 
+/// Helpful functions to work with `Spanned` values
 impl<T> Spanned<T> {
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Spanned<U> {
         Spanned {

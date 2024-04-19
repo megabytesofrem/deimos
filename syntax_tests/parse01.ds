@@ -1,6 +1,0 @@
-let x:int = 1
-
-function foo()
-    let z:int = 3 + 2 * y
-    return z
-end
