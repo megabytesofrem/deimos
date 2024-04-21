@@ -70,8 +70,8 @@ pub enum TokenKind {
     KwEnum,
     #[token("function")]
     KwFunction,
-    #[token("c_import")]
-    KwCImport,
+    #[token("extern")]
+    KwExtern,
     #[token("import")]
     KwImport,
     #[token("as")]
@@ -119,8 +119,11 @@ pub enum TokenKind {
     Comment,
 
     // We ignore whitespace in the lexer
-    #[regex(r"[ \r\t\n\f]+", logos::skip)]
+    #[regex(r"[ \t\f]+", logos::skip, priority = 2)]
     Whitespace,
+
+    #[regex(r"[\r\n]+", logos::skip)]
+    NewLine,
 }
 
 #[derive(Debug, Clone, PartialEq)]

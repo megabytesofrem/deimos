@@ -4,8 +4,8 @@
 use crate::syntax::ast::Ast;
 use crate::syntax::ast::ToplevelStmt;
 use crate::syntax::errors::SyntaxError;
-use crate::syntax::lexer::{LexerIter, Token, TokenKind};
 use crate::syntax::lexer::SourceLoc;
+use crate::syntax::lexer::{LexerIter, Token, TokenKind};
 use crate::syntax::span::{spanned, Spanned};
 
 mod parse_expr;
@@ -15,7 +15,9 @@ mod parse_stmt;
 pub struct Parser<'cx> {
     tokens: LexerIter<'cx>,
     errors: Vec<SyntaxError>,
-    pos: usize,
+
+    line: usize,
+    col: usize,
 }
 
 /// Result type for parsing
@@ -27,7 +29,8 @@ impl<'cx> Parser<'cx> {
         Parser {
             tokens,
             errors: Vec::new(),
-            pos: 0,
+            line: 1,
+            col: 0,
         }
     }
 
@@ -42,7 +45,7 @@ impl<'cx> Parser<'cx> {
 
     /// Advance the parser by one token
     pub(crate) fn advance(&mut self) -> Option<Token<'cx>> {
-        self.pos += 1;
+        self.col += 1;
         let token = self.tokens.next();
         token
     }
@@ -92,13 +95,22 @@ impl<'cx> Parser<'cx> {
 
         while let Some(token) = parser.clone().peek() {
             match token.kind {
+                TokenKind::NewLine => {
+                    parser.line += 1;
+                    parser.col = 0;
+
+                    parser.advance();
+                }
                 TokenKind::Comment => {
                     // Skip comments while still storing them in the AST
                     let location = token.location;
                     parser.advance();
                     comments.push((location, token.literal.to_string()));
                 }
-                TokenKind::KwFunction | TokenKind::KwStruct | TokenKind::KwEnum => {
+                TokenKind::KwFunction
+                | TokenKind::KwStruct
+                | TokenKind::KwEnum
+                | TokenKind::KwExtern => {
                     // Functions are top-level nodes
                     let location = token.location.clone();
                     let stmt = match parser.parse_toplevel_stmt() {

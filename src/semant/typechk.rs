@@ -2,12 +2,13 @@
 
 use thiserror::Error;
 
+use crate::syntax::ast::Numeric;
+use crate::syntax::lexer::BinOp;
+use crate::syntax::lexer::SourceLoc;
 use crate::syntax::{
     ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty},
-    lexer::{BinOp, SourceLoc},
     span::Spanned,
 };
-use crate::syntax::ast::Numeric;
 
 use super::scope::ScopeStack;
 use super::typed_ast::*;
@@ -49,7 +50,6 @@ pub enum TypeError {
 pub(crate) type Return<T> = Result<T, TypeError>;
 pub(crate) type ReturnMany<'cx, T> = anyhow::Result<T, Vec<TypeError>>;
 
-
 // Macro to return an error while also pushing it to the error list,
 // so we can bubble them up instead of early returning. We do need to `clone` everything when using
 // the macro though.
@@ -68,7 +68,7 @@ pub struct Typeck<'cx> {
     ctx: ScopeStack,
     marker: std::marker::PhantomData<&'cx ()>,
 
-    errors: Vec<TypeError>,
+    pub errors: Vec<TypeError>,
 }
 
 impl<'cx> Typeck<'cx> {
@@ -80,123 +80,14 @@ impl<'cx> Typeck<'cx> {
         }
     }
 
-    // Inference functions
-
-    fn infer_binop(&mut self, lhs: &Spanned<Expr>, op: BinOp, rhs: &Spanned<Expr>) -> Return<Ty> {
-        let lhs_ty = self.infer_expr(lhs)?;
-        let rhs_ty = self.infer_expr(rhs)?;
-
-        if lhs_ty != rhs_ty {
-            bubble_err!(self, TypeError::TypeMismatch {
-                expected: lhs_ty.clone(),
-                found: rhs_ty.clone(),
-                location: lhs.location.clone(),
-            });
-        }
-
-        match op {
-            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
-                if !lhs_ty.is_numeric() && rhs_ty != lhs_ty {
-                    bubble_err!(self, TypeError::TypeMismatch {
-                        expected: lhs_ty.clone(),
-                        found: rhs_ty.clone(),
-                        location: lhs.location.clone(),
-                    });
-                }
-
-                Ok(lhs_ty)
-            }
-            BinOp::Eq
-            | BinOp::BangEq
-            | BinOp::Less
-            | BinOp::LessEq
-            | BinOp::Greater
-            | BinOp::GreaterEq
-            | BinOp::And
-            | BinOp::Or => Ok(Ty::Bool),
-        }
-    }
-
-    fn infer_array(&mut self, elems: &[Spanned<Expr>]) -> Return<Ty> {
-        if elems.is_empty() {
-            return Ok(Ty::Array(Box::new(Ty::Unknown)));
-        }
-
-        // Infer the overall type of the array from the first element
-        let elem_ty = self.infer_expr(&elems[0])?;
-        elems.iter().skip(1).try_for_each(|elem| {
-            let ty = self.infer_expr(elem)?;
-            if ty != elem_ty {
-                bubble_err!(self, TypeError::TypeMismatch {
-                    expected: elem_ty.clone(),
-                    found: ty.clone(),
-                    location: elem.location.clone(),
-                });
-            }
-            Ok(())
-        })?;
-
-        Ok(Ty::Array(Box::new(elem_ty)))
-    }
-
-    fn infer_tuple(&mut self, elems: &[Spanned<Expr>]) -> Return<Ty> {
-        let mut tys = Vec::new();
-        for elem in elems {
-            tys.push(self.infer_expr(elem)?);
-        }
-
-        Ok(Ty::Tuple(tys))
-    }
-
-    fn infer_arraylike_index(
-        &mut self,
-        indexable: &Spanned<Expr>,
-        index: &Spanned<Expr>,
-    ) -> Return<Ty> {
-        let indexable_ty = self.infer_expr(indexable)?;
-        let index_ty = self.infer_expr(index)?;
-
-        // Check if `index_ty` is a valid index type or not
-        if !index_ty.is_index_type() {
-            bubble_err!(self, TypeError::TypeMismatch {
-                expected: Ty::Numeric(Numeric::I32),
-                found: index_ty.clone(),
-                location: index.location.clone(),
-            });
-        }
-
-        match indexable_ty {
-            Ty::Array(ty) => Ok(*ty),
-
-            #[rustfmt::skip]
-            _ => {
-                bubble_err!(self, TypeError::TypeMismatch {
-                    expected: Ty::Array(Box::new(Ty::Unknown)),
-                    found: indexable_ty.clone(),
-                    location: indexable.location.clone(),
-                });
-            }
-        }
-    }
-
-
-    fn infer_expr(&mut self, expr: &Spanned<Expr>) -> Return<Ty> {
-        match &expr.target {
-            Expr::Literal(lit) => self.check_literal(lit),
-            Expr::Variable(name) => self.check_variable(name, expr.location.clone()),
-            Expr::BinOp(lhs, op, rhs) => self.infer_binop(lhs, op.clone(), rhs),
-            Expr::Array(elems) => self.infer_array(elems),
-            Expr::Tuple(elems) => self.infer_tuple(elems),
-            Expr::ArrayIndex { array, index } => self.infer_arraylike_index(array, index),
-            Expr::Call { .. } => todo!(),
-            _ => todo!(),
-        }
+    pub(crate) fn get_context(&self) -> &ScopeStack {
+        &self.ctx
     }
 
     // Checking functions
     // NOTE: We operate on the AST wrapped in Spanned<T>
 
-    fn check_variable(&self, name: &str, location: SourceLoc) -> Return<Ty> {
+    pub(crate) fn check_variable(&self, name: &str, location: SourceLoc) -> Return<Ty> {
         self.ctx
             .get(name)
             .cloned()
@@ -206,7 +97,7 @@ impl<'cx> Typeck<'cx> {
             })
     }
 
-    fn check_literal(&self, literal: &Literal) -> Return<Ty> {
+    pub(crate) fn check_literal(&self, literal: &Literal) -> Return<Ty> {
         match literal {
             Literal::Int(_) => Ok(Ty::Numeric(Numeric::I32)),
             Literal::Float(_) => Ok(Ty::Numeric(Numeric::F32)),
@@ -227,11 +118,14 @@ impl<'cx> Typeck<'cx> {
                 Expr::Variable(name) => {
                     let ty2 = self.check_variable(&name, expr.location.clone())?;
                     if ty != ty2 {
-                        bubble_err!(self, TypeError::TypeMismatch {
-                            expected: ty.clone(),
-                            found: ty2.clone(),
-                            location: expr.location.clone(),
-                        });
+                        bubble_err!(
+                            self,
+                            TypeError::TypeMismatch {
+                                expected: ty.clone(),
+                                found: ty2.clone(),
+                                location: expr.location.clone(),
+                            }
+                        );
                     } else {
                         // Variable is valid
                         return Ok(TExpr::Variable(name.clone(), ty.clone()));
@@ -265,14 +159,13 @@ impl<'cx> Typeck<'cx> {
                     });
                 }
                 Expr::Call { callee, args } => {
-                    let callee = self.check_expr(expr)?;
                     let mut args_ = Vec::new();
                     for arg in args {
                         args_.push(self.check_expr(&arg)?);
                     }
 
                     return Ok(TExpr::Call {
-                        callee: Box::new(callee),
+                        callee: Box::new(self.check_expr(&callee)?),
                         args: args_,
                     });
                 }
@@ -302,14 +195,17 @@ impl<'cx> Typeck<'cx> {
 
                     // Check if the local is not already defined
                     if self.ctx.get(&name).is_some() {
-                        bubble_err!(self, TypeError::Redefinition {
-                            name: name.clone(),
-                            location: stmt.location.clone(),
-                        });
+                        bubble_err!(
+                            self,
+                            TypeError::Redefinition {
+                                name: name.clone(),
+                                location: stmt.location.clone(),
+                            }
+                        );
                     }
 
                     self.ctx.insert(name.clone(), ty.clone());
-                    Ok(TStmt::VarDecl {
+                    Ok(TStmt::Let {
                         name: name.clone(),
                         ty: Some(ty),
                         value: value.map(|v| v.unwrap()),
@@ -320,11 +216,14 @@ impl<'cx> Typeck<'cx> {
                     let value_ty = self.infer_expr(&value)?;
 
                     if target_ty != value_ty {
-                        bubble_err!(self, TypeError::TypeMismatch {
-                            expected: target_ty.clone(),
-                            found: value_ty.clone(),
-                            location: value.location.clone(),
-                        });
+                        bubble_err!(
+                            self,
+                            TypeError::TypeMismatch {
+                                expected: target_ty.clone(),
+                                found: value_ty.clone(),
+                                location: value.location.clone(),
+                            }
+                        );
                     }
 
                     Ok(TStmt::Assign {
@@ -346,6 +245,42 @@ impl<'cx> Typeck<'cx> {
         Ok(block_)
     }
 
+    fn check_extern_declare(
+        &mut self,
+        name: &str,
+        params: &[(String, Ty)],
+        return_ty: Ty,
+    ) -> Return<TToplevelStmt> {
+        // Check if the function is not already defined
+        if self.ctx.get(name).is_some() {
+            bubble_err!(
+                self,
+                TypeError::Redefinition {
+                    name: name.to_string(),
+                    location: SourceLoc::default(),
+                }
+            );
+        }
+
+        // Insert the function into the context
+        let param_tys = params.iter().map(|(_, ty)| ty.clone()).collect();
+        self.ctx.insert(
+            name.to_string(),
+            Ty::Function(Box::new(return_ty.clone()), param_tys),
+        );
+
+        // Insert the function parameters into the context
+        for (name, ty) in params {
+            self.ctx.insert(name.clone(), ty.clone());
+        }
+
+        Ok(TToplevelStmt::ExternDecl {
+            name: name.to_string(),
+            params: params.to_vec(),
+            return_ty,
+        })
+    }
+
     fn check_struct_declare(
         &mut self,
         name: &str,
@@ -353,10 +288,13 @@ impl<'cx> Typeck<'cx> {
     ) -> Return<TToplevelStmt> {
         // Check if the struct is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(self, TypeError::Redefinition {
-                name: name.to_string(),
-                location: SourceLoc::default(),
-            });
+            bubble_err!(
+                self,
+                TypeError::Redefinition {
+                    name: name.to_string(),
+                    location: SourceLoc::default(),
+                }
+            );
         }
 
         // Insert the struct into the context
@@ -368,17 +306,16 @@ impl<'cx> Typeck<'cx> {
         })
     }
 
-    fn check_enum_declare(
-        &mut self,
-        name: &str,
-        fields: &[String],
-    ) -> Return<TToplevelStmt> {
+    fn check_enum_declare(&mut self, name: &str, fields: &[String]) -> Return<TToplevelStmt> {
         // Check if the enum is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(self, TypeError::Redefinition {
-                name: name.to_string(),
-                location: SourceLoc::default(),
-            });
+            bubble_err!(
+                self,
+                TypeError::Redefinition {
+                    name: name.to_string(),
+                    location: SourceLoc::default(),
+                }
+            );
         }
 
         // Insert the enum into the context
@@ -404,15 +341,21 @@ impl<'cx> Typeck<'cx> {
     ) -> Return<TToplevelStmt> {
         // Check if the function is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(self, TypeError::Redefinition {
-                name: name.to_string(),
-                location: SourceLoc::default(),
-            });
+            bubble_err!(
+                self,
+                TypeError::Redefinition {
+                    name: name.to_string(),
+                    location: SourceLoc::default(),
+                }
+            );
         }
 
         // Insert the function into the context
         let param_tys = params.iter().map(|(_, ty)| ty.clone()).collect();
-        self.ctx.insert(name.to_string(), Ty::Function(Box::new(return_ty.clone()), param_tys));
+        self.ctx.insert(
+            name.to_string(),
+            Ty::Function(Box::new(return_ty.clone()), param_tys),
+        );
 
         // Insert the function parameters into the context
         for (name, ty) in params {
@@ -434,32 +377,30 @@ impl<'cx> Typeck<'cx> {
         &mut self,
         stmt: &Spanned<ToplevelStmt>,
     ) -> Return<Spanned<TToplevelStmt>> {
-        stmt.clone().flat_map_spanned(|target| {
-            match target {
-                ToplevelStmt::Import { path, alias } => {
-                    Ok(TToplevelStmt::Import {
-                        path: path.clone(),
-                        alias: alias.clone(),
-                    })
-                }
-                ToplevelStmt::StructDecl { name, fields } => {
-                    self.check_struct_declare(&name, &fields)
-                }
-                ToplevelStmt::EnumDecl { name, fields } => {
-                    self.check_enum_declare(&name, &fields)
-                }
-                ToplevelStmt::FunctionDecl {
-                    name,
-                    return_ty,
-                    params,
-                    body,
-                } => self.check_function_declare(&name, return_ty.clone(), &params, &body),
-                ToplevelStmt::Stmt(stmt) => {
-                    let stmt = self.check_stmt(&stmt)?;
-                    Ok(TToplevelStmt::Stmt(stmt))
-                }
-                _ => unimplemented!(),
+        stmt.clone().flat_map_spanned(|target| match target {
+            ToplevelStmt::Import { path, alias } => Ok(TToplevelStmt::Import {
+                path: path.clone(),
+                alias: alias.clone(),
+            }),
+            ToplevelStmt::StructDecl { name, fields } => self.check_struct_declare(&name, &fields),
+            ToplevelStmt::EnumDecl { name, fields } => self.check_enum_declare(&name, &fields),
+            ToplevelStmt::FunctionDecl {
+                name,
+                return_ty,
+                params,
+                body,
+            } => self.check_function_declare(&name, return_ty.clone(), &params, &body),
+            ToplevelStmt::ExternDecl {
+                name,
+                params,
+                return_ty,
+            } => self.check_extern_declare(&name, &params, return_ty.clone()),
+
+            ToplevelStmt::Stmt(stmt) => {
+                let stmt = self.check_stmt(&stmt)?;
+                Ok(TToplevelStmt::Stmt(stmt))
             }
+            _ => unimplemented!(),
         })
     }
 

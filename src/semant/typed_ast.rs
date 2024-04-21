@@ -37,7 +37,7 @@ pub enum TStmt {
     Expr(TExpr),
     Return(Option<Spanned<TExpr>>),
 
-    VarDecl {
+    Let {
         name: String,
         ty: Option<Ty>,
         value: Option<Spanned<TExpr>>,
@@ -67,7 +67,10 @@ pub type TBlock = Vec<Spanned<TStmt>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TToplevelStmt {
-    Import { path: Vec<String>, alias: Option<String> },
+    Import {
+        path: Vec<String>,
+        alias: Option<String>,
+    },
     Stmt(Spanned<TStmt>),
 
     EnumDecl {
@@ -80,13 +83,18 @@ pub enum TToplevelStmt {
         fields: Vec<(String, Ty)>,
     },
 
+    ExternDecl {
+        name: String,
+        params: Vec<(String, Ty)>,
+        return_ty: Ty,
+    },
+
     FunctionDecl {
         name: String,
         params: Vec<(String, Ty)>,
         return_ty: Ty,
         body: TBlock,
     },
-    Error,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -4,7 +4,7 @@
 use crate::parser;
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
-use crate::syntax::lexer::TokenKind;
+use crate::syntax::lexer::{Token, TokenKind};
 use crate::syntax::span::{spanned, Spanned};
 
 use super::Parser;
@@ -138,28 +138,6 @@ impl<'cx> Parser<'cx> {
         Ok(params)
     }
 
-    pub(crate) fn parse_toplevel_stmt(&mut self) -> parser::Return<ToplevelStmt> {
-        let result = match self.peek() {
-            Some(token) => match token.kind {
-                //TokenKind::KwImport => self.parse_import(),
-                TokenKind::KwStruct => self.parse_struct_declare(),
-                TokenKind::KwEnum => self.parse_enum_declare(),
-                TokenKind::KwFunction => self.parse_function_declare(),
-                _ => Err(SyntaxError::UnexpectedToken {
-                    token: token.kind.clone(),
-                    location: token.location.clone(),
-                }),
-            },
-            None => Err(SyntaxError::UnexpectedEof),
-        };
-
-        if let Err(err) = &result {
-            self.errors.push(err.clone());
-        }
-
-        result
-    }
-
     pub(crate) fn parse_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
         // FIXME: Why is it not erroring on completely moronic tokens?
         //println!("got: {:?}", self.peek());
@@ -167,7 +145,7 @@ impl<'cx> Parser<'cx> {
         let result = match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwLet => self.parse_let_stmt(),
-                TokenKind::Ident => self.parse_assignment(),
+                TokenKind::Ident => self.parse_ident_or_assign(),
                 TokenKind::KwIf => self.parse_if_stmt(),
                 TokenKind::KwFor => self.parse_for_loop(),
                 TokenKind::KwWhile => self.parse_while_loop(),
@@ -209,13 +187,28 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_assignment(&mut self) -> parser::Return<Spanned<Stmt>> {
-        // ident = expr
+    fn parse_ident_or_assign(&mut self) -> parser::Return<Spanned<Stmt>> {
+        // ident = expr or ident(expr, expr, ...)
         let ident = self.expect(TokenKind::Ident)?;
+        match self.peek() {
+            Some(token) => match token.kind {
+                TokenKind::Equal => self.parse_assign_stmt(ident),
+                TokenKind::LParen => {
+                    let expr = self.parse_function_call(ident.literal.to_string())?;
+                    Ok(spanned(Stmt::Expr(expr), ident.location))
+                }
+                _ => Err(SyntaxError::UnexpectedToken {
+                    token: token.kind.clone(),
+                    location: token.location.clone(),
+                }),
+            },
+            None => Err(SyntaxError::UnexpectedEof),
+        }
+    }
 
-        // Check that an equals is present after the identifier, if not, error
+    fn parse_assign_stmt(&mut self, ident: Token) -> parser::Return<Spanned<Stmt>> {
+        // ident = expr
         self.expect(TokenKind::Equal)?;
-
         let expr = self.parse_expr()?;
         Ok(spanned(
             Stmt::Assign {
@@ -230,6 +223,12 @@ impl<'cx> Parser<'cx> {
     }
 
     fn parse_if_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
+        // if condition then
+        //  then_block
+        // else
+        //  else_block
+        // end
+
         let token = self.expect(TokenKind::KwIf)?;
         let condition = self.parse_expr()?;
 
@@ -309,6 +308,58 @@ impl<'cx> Parser<'cx> {
         };
 
         Ok(spanned(Stmt::Return(expr), token.location))
+    }
+
+    pub(crate) fn parse_toplevel_stmt(&mut self) -> parser::Return<ToplevelStmt> {
+        let result = match self.peek() {
+            Some(token) => match token.kind {
+                //TokenKind::KwImport => self.parse_import(),
+                TokenKind::KwStruct => self.parse_struct_declare(),
+                TokenKind::KwEnum => self.parse_enum_declare(),
+                TokenKind::KwFunction => self.parse_function_declare(),
+                TokenKind::KwExtern => self.parse_extern_declare(),
+
+                // Unexpected token
+                _ => Err(SyntaxError::UnexpectedToken {
+                    token: token.kind.clone(),
+                    location: token.location.clone(),
+                }),
+            },
+            None => Err(SyntaxError::UnexpectedEof),
+        };
+
+        if let Err(err) = &result {
+            self.errors.push(err.clone());
+        }
+
+        result
+    }
+
+    fn parse_extern_declare(&mut self) -> parser::Return<ToplevelStmt> {
+        // External functions imported from C
+
+        // extern cfunction_name(param:type, param:type, ...): return_type?
+        let mut return_type: Ty = Ty::Void;
+        self.expect(TokenKind::KwExtern)?;
+        let name = self.expect(TokenKind::Ident)?;
+
+        self.expect(TokenKind::LParen)?;
+        let params = self.parse_annotated_params()?;
+        self.expect(TokenKind::RParen)?;
+
+        // Parse return type if it is present
+        if let Some(token) = self.peek() {
+            if token.kind == TokenKind::Colon {
+                self.advance();
+                return_type = self.parse_type()?;
+            }
+        }
+
+        Ok(ToplevelStmt::ExternDecl {
+            name: name.literal.to_string(),
+            params,
+            return_ty: return_type,
+        })
     }
 
     fn parse_struct_declare(&mut self) -> parser::Return<ToplevelStmt> {

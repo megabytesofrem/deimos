@@ -51,10 +51,7 @@ pub enum Ty {
 
 impl Ty {
     pub fn is_primitive(&self) -> bool {
-        matches!(
-            self,
-            Ty::Numeric(_) | Ty::Bool | Ty::Char | Ty::String
-        )
+        matches!(self, Ty::Numeric(_) | Ty::Bool | Ty::Char | Ty::String)
     }
 
     pub fn is_numeric(&self) -> bool {
@@ -144,7 +141,10 @@ pub type Block = Vec<Spanned<Stmt>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
-    Import { path: Vec<String>, alias: Option<String> },
+    Import {
+        path: Vec<String>,
+        alias: Option<String>,
+    },
 
     Stmt(Spanned<Stmt>),
 
@@ -156,6 +156,12 @@ pub enum ToplevelStmt {
     StructDecl {
         name: String,
         fields: Vec<(String, Ty)>,
+    },
+
+    ExternDecl {
+        name: String,
+        params: Vec<(String, Ty)>,
+        return_ty: Ty,
     },
 
     FunctionDecl {

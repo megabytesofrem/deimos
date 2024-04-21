@@ -1,15 +1,17 @@
 use std::error::Error;
 
+use deimos::codegen::transpile::Transpiler;
 use deimos::parser::Parser;
 use deimos::semant::typechk::Typeck;
 
 fn main() {
-    println!("Deimos compiler v0.0.0.1");
-    println!("----------------------------------------------------------------");
+    println!("Deimos compiler v0.0.0.2");
+    println!("================================================================");
     println!("This compiler is a stage1 compiler, only used for bootstrapping.");
-    println!("----------------------------------------------------------------");
+    println!("    The generated code may be atrocious as a result of this.    ");
+    println!("================================================================");
 
-    let src = std::fs::read_to_string("test/ksp.dms").expect("Failed to read file");
+    let src = std::fs::read_to_string("test/io.dms").expect("Failed to read file");
 
     drive(&src).unwrap_or_else(|e| {
         eprintln!("{}", e);
@@ -33,8 +35,9 @@ fn drive(src: &str) -> anyhow::Result<()> {
         anyhow::anyhow!("Type checking failed")
     })?;
 
-    println!("Typecheck successful");
-    println!("{:#?}", typed_ast);
+    // Compile the typed AST to C code
+    let compiler = Transpiler::compile(&typed_ast);
+    println!("{}", compiler);
 
     Ok(())
 }

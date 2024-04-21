@@ -141,7 +141,7 @@ impl<'cx> Parser<'cx> {
         match self.peek().map(|t| t.kind) {
             Some(TokenKind::LParen) => {
                 // Function call
-                todo!()
+                return self.parse_function_call(name);
             }
             Some(TokenKind::LSquare) => {
                 // Array index
@@ -152,6 +152,43 @@ impl<'cx> Parser<'cx> {
             // Just an identifier
             _ => Ok(spanned(Expr::Variable(name), location)),
         }
+    }
+
+    pub(crate) fn parse_function_call(&mut self, name: String) -> parser::Return<Spanned<Expr>> {
+        let location = self.peek().map(|t| t.location).unwrap_or_default();
+        let mut args = Vec::new();
+
+        self.expect(TokenKind::LParen)?;
+
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::RParen {
+                break;
+            }
+
+            let expr = self.parse_expr()?;
+            args.push(expr);
+
+            if let Some(token) = self.peek() {
+                if token.kind == TokenKind::RParen {
+                    break;
+                }
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+
+        let loc = self.peek().map(|t| t.location.clone()).unwrap_or_default();
+        self.expect_error(
+            TokenKind::RParen,
+            SyntaxError::UnmatchedBrackets { location: loc },
+        )?;
+
+        Ok(spanned(
+            Expr::Call {
+                callee: Box::new(spanned(Expr::Variable(name), location.clone())),
+                args,
+            },
+            location,
+        ))
     }
 
     fn parse_primary(&mut self) -> parser::Return<Spanned<Expr>> {
