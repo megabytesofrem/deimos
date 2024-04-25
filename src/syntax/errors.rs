@@ -4,9 +4,10 @@ use crate::syntax::lexer::{SourceLoc, TokenKind};
 
 #[derive(Error, Debug, Clone)]
 pub enum SyntaxError {
-    #[error("{location:?} Unexpected token '{token:?}'")]
+    #[error("{location:?} Unexpected token '{token:?}', expected {expected_any:?}")]
     UnexpectedToken {
         token: TokenKind,
+        expected_any: Vec<TokenKind>,
         location: SourceLoc,
     },
 

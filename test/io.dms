@@ -1,5 +1,0 @@
-extern printc(m: string): void
-
-function main():void
-    printc("Hello, world!")
-end

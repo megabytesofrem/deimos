@@ -153,6 +153,31 @@ impl PrettyPrinter {
                     .unwrap_or_default();
                 format!("{} {} = {};", ty_str, name, value_str)
             }
+            TStmt::Assign { target, value } => {
+                let target_str = self.gen_expr(&target);
+                let value_str = self.gen_expr(&value.target);
+                format!("{} = {};", target_str, value_str)
+            }
+            TStmt::If {
+                cond,
+                then_block,
+                else_block,
+            } => {
+                let cond_str = self.gen_expr(&cond.target);
+                let then_block_str = self.gen_block(then_block);
+                let else_block_str = else_block
+                    .as_ref()
+                    .map(|block| self.gen_block(block))
+                    .unwrap_or_default();
+
+                let else_str = if else_block.is_some() {
+                    format!("else {}", else_block_str)
+                } else {
+                    String::new()
+                };
+
+                format!("if ({}) {} {}", cond_str, then_block_str, else_str)
+            }
             // Add more cases as needed
             _ => unimplemented!("tstmt"),
         }
@@ -185,7 +210,13 @@ impl PrettyPrinter {
                     .collect::<Vec<String>>()
                     .join(", ");
                 let body_str = self.gen_block(body);
-                format!("void {} ({}) {}", name, params_str, body_str)
+                format!(
+                    "{} {} ({}) {}",
+                    self.to_typename(return_ty.clone()),
+                    name,
+                    params_str,
+                    body_str
+                )
             }
             TToplevelStmt::ExternDecl {
                 name,
@@ -198,8 +229,7 @@ impl PrettyPrinter {
                     .collect::<Vec<String>>()
                     .join(", ");
 
-                // Just add a comment since we don't actually want this to do anything
-                // but it needs to return something
+                // Add a comment marking the extern declaration to track it in the generated code
                 format!(
                     "// extern {} {} ({})",
                     self.to_typename(return_ty.clone()),

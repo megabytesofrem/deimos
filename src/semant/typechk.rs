@@ -3,7 +3,6 @@
 use thiserror::Error;
 
 use crate::syntax::ast::Numeric;
-use crate::syntax::lexer::BinOp;
 use crate::syntax::lexer::SourceLoc;
 use crate::syntax::{
     ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty},
@@ -229,6 +228,24 @@ impl<'cx> Typeck<'cx> {
                     Ok(TStmt::Assign {
                         target: self.check_expr(&target)?.target,
                         value: self.check_expr(&value)?,
+                    })
+                }
+                Stmt::If {
+                    cond,
+                    then_block,
+                    else_block,
+                } => {
+                    let cond = self.check_expr(&cond)?;
+                    let then_block = self.check_block(&then_block)?;
+                    let else_block = else_block
+                        .as_ref()
+                        .map(|block| self.check_block(block))
+                        .transpose()?;
+
+                    Ok(TStmt::If {
+                        cond: cond,
+                        then_block,
+                        else_block,
                     })
                 }
                 _ => unimplemented!(),

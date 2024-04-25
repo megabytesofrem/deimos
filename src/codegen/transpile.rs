@@ -23,15 +23,15 @@ impl Transpiler {
     fn compile_ast(&mut self, ast: &TypedAst) {
         // Just copy and paste the standard library into the generated code
         //
-        // FIXME: THIS IS EXTREMELY HACKY AND SHOULD BE REPLACED WITH A PROPER MODULE SYSTEM
-        // AS SOON AS POSSIBLE, BUT WILL DO FOR A STAGE 1 BOOTSTRAP COMPILER AND EVEN THEN IT'S
-        // STILL ATROCIOUS
+        // FIXME: This is _extremely_ hacky and should be replaced with a proper module system
+        // ASAP but will work for now.
 
         let dstring = std::fs::read_to_string("c_lib/dstring.h").expect("Failed to read dstring.h");
         let prelude = std::fs::read_to_string("c_lib/prelude.h").expect("Failed to read prelude.h");
 
-        self.pp.emit_line(&dstring);
-        self.pp.emit_line(&prelude);
+        self.pp.emit(&dstring);
+        self.pp.lines.push("\n".to_string());
+        self.pp.emit(&prelude);
 
         for stmt in &ast.nodes.clone() {
             let stmt_str = self.pp.gen_toplevel_stmt(&stmt.target);

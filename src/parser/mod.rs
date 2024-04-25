@@ -1,5 +1,4 @@
-//! Shared parser module that contains common parsing utilities
-//! used in both the expression and statement parsers.
+//! The main parser module for Deimos.
 
 use crate::syntax::ast::Ast;
 use crate::syntax::ast::ToplevelStmt;
@@ -8,8 +7,9 @@ use crate::syntax::lexer::SourceLoc;
 use crate::syntax::lexer::{LexerIter, Token, TokenKind};
 use crate::syntax::span::{spanned, Spanned};
 
-mod parse_expr;
-mod parse_stmt;
+mod expr;
+mod stmt;
+mod tidbits;
 
 #[derive(Clone)]
 pub struct Parser<'cx> {
@@ -22,7 +22,7 @@ pub struct Parser<'cx> {
 
 /// Result type for parsing
 pub(crate) type Return<'cx, T> = anyhow::Result<T, SyntaxError>;
-pub(crate) type ReturnMany<'cx, T> = anyhow::Result<T, Vec<SyntaxError>>;
+pub(crate) type ReturnBundle<'cx, T> = anyhow::Result<T, Vec<SyntaxError>>;
 
 impl<'cx> Parser<'cx> {
     pub fn new(tokens: LexerIter<'cx>) -> Self {
@@ -58,6 +58,7 @@ impl<'cx> Parser<'cx> {
         } else {
             let err = SyntaxError::UnexpectedToken {
                 token: token.kind,
+                expected_any: vec![kind],
                 location: token.location,
             };
 
@@ -74,6 +75,23 @@ impl<'cx> Parser<'cx> {
         } else {
             let err = SyntaxError::UnexpectedToken {
                 token: token.kind,
+                expected_any: vec![kind],
+                location: token.location,
+            };
+
+            self.errors.push(err.clone());
+            Err(err)
+        }
+    }
+
+    pub(crate) fn expect_one_of(&mut self, kinds: Vec<TokenKind>) -> Return<Token<'cx>> {
+        let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
+        if kinds.contains(&token.kind) {
+            Ok(token)
+        } else {
+            let err = SyntaxError::UnexpectedToken {
+                token: token.kind,
+                expected_any: kinds,
                 location: token.location,
             };
 
@@ -87,7 +105,7 @@ impl<'cx> Parser<'cx> {
         self.expect(kind).map_err(|_| err)
     }
 
-    pub fn parse(src: &'cx str) -> ReturnMany<'cx, Ast> {
+    pub fn parse(src: &'cx str) -> ReturnBundle<'cx, Ast> {
         let mut parser = Parser::new(crate::syntax::lexer::lex_tokens(src));
         let mut nodes: Vec<Spanned<ToplevelStmt>> = Vec::new();
 

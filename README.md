@@ -6,8 +6,8 @@
 The compiler for Deimos, a small, low-level Lua inspired language.
 
 ```lua
-function main() 
-    io.print("Hello world")
+function main()
+    io.print("Hello, world")
 end
 ```
 

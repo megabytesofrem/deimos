@@ -8,20 +8,16 @@ fn main() {
     println!("Deimos compiler v0.0.0.2");
     println!("================================================================");
     println!("This compiler is a stage1 compiler, only used for bootstrapping.");
-    println!("    The generated code may be atrocious as a result of this.    ");
     println!("================================================================");
 
-    let src = std::fs::read_to_string("test/io.dms").expect("Failed to read file");
-
+    let src = std::fs::read_to_string("test/ifelse.dms").expect("Failed to read file");
     drive(&src).unwrap_or_else(|e| {
         eprintln!("{}", e);
     });
 }
 
 fn print_errors(errors: Vec<impl Error>) {
-    for e in errors {
-        eprintln!("{}", e);
-    }
+    errors.iter().for_each(|e| eprintln!("{}", e));
 }
 
 fn drive(src: &str) -> anyhow::Result<()> {
@@ -34,6 +30,8 @@ fn drive(src: &str) -> anyhow::Result<()> {
         print_errors(e);
         anyhow::anyhow!("Type checking failed")
     })?;
+
+    println!("{:#?}", typed_ast);
 
     // Compile the typed AST to C code
     let compiler = Transpiler::compile(&typed_ast);
