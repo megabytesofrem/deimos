@@ -6,13 +6,12 @@
 
 /* A standard library immutable string that stores it's length */
 typedef struct D_String {
-    char* data;
+    char *data;
     int length;
 } D_String;
 
-D_String string_from_c_str(char* data);
-D_String string_from_c_str(char* data)
-{
+D_String string_from_c_str(char *data);
+D_String string_from_c_str(char *data) {
     D_String string;
     string.data = data;
 
@@ -25,10 +24,9 @@ D_String string_from_c_str(char* data)
     return string;
 }
 
-char* string_to_c_str(D_String string);
-char* string_to_c_str(D_String string)
-{
-    char* data = (char*)malloc(string.length + 1);
+char *string_to_c_str(D_String string);
+char *string_to_c_str(D_String string) {
+    char *data = (char *)malloc(string.length + 1);
     if (data == NULL) {
         return NULL;
     }

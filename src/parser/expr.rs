@@ -1,13 +1,12 @@
 //! Parsing of expressions
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
+use super::Parser;
 use crate::parser;
-use crate::syntax::ast::{Expr, Literal};
+use crate::syntax::ast::{Expr, Literal, Ty};
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{BinOp, Token, TokenKind, UnOp};
-use crate::syntax::span::{spanned, Spanned};
-
-use super::Parser;
+use crate::utils::{spanned, Spanned};
 
 fn strip_quotes(s: &str) -> &str {
     &s[1..s.len() - 1]
@@ -82,7 +81,7 @@ impl TokenKind {
 impl<'cx> Parser<'cx> {
     fn parse_expr_prec(&mut self, min_prec: u8) -> parser::Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.location).unwrap_or_default();
-        let mut lhs = self.parse_primary()?;
+        let mut lhs = self.parse_primary_expr()?;
 
         while let Some(op) = self.peek() {
             let op = op.clone().kind;
@@ -126,31 +125,12 @@ impl<'cx> Parser<'cx> {
 
         match token.kind {
             TokenKind::Integer => Ok(Literal::Int(token.to_int_literal())),
-            TokenKind::Float => Ok(Literal::Float(token.literal.parse().unwrap())),
+            TokenKind::Float => Ok(Literal::Float32(token.literal.parse().unwrap())),
             TokenKind::StringLit => Ok(Literal::String(strip_quotes(token.literal).to_string())),
             TokenKind::KwTrue => Ok(Literal::Bool(true)),
             TokenKind::KwFalse => Ok(Literal::Bool(false)),
 
             _ => panic!("Invalid literal: {:?}", token),
-        }
-    }
-
-    fn parse_starting_ident(&mut self, name: String) -> parser::Return<Spanned<Expr>> {
-        let location = self.peek().map(|t| t.location).unwrap_or_default();
-
-        match self.peek().map(|t| t.kind) {
-            Some(TokenKind::LParen) => {
-                // Function call
-                return self.parse_function_call(name);
-            }
-            Some(TokenKind::LSquare) => {
-                // Array index
-                let expr = self.parse_expr()?;
-                return self.parse_array_index(&expr.target);
-            }
-
-            // Just an identifier
-            _ => Ok(spanned(Expr::Variable(name), location)),
         }
     }
 
@@ -191,7 +171,19 @@ impl<'cx> Parser<'cx> {
         ))
     }
 
-    fn parse_primary(&mut self) -> parser::Return<Spanned<Expr>> {
+    fn parse_cast_expr(&mut self) -> parser::Return<Spanned<Expr>> {
+        // let ident:type = cast(expr, type)
+        let location = self.peek().map(|t| t.location).unwrap_or_default();
+        self.expect(TokenKind::LParen)?;
+        let expr = self.parse_expr()?;
+        self.expect(TokenKind::Comma)?;
+        let ty = self.parse_type()?;
+        self.expect(TokenKind::RParen)?;
+
+        Ok(spanned(Expr::Cast(Box::new(expr), ty), location))
+    }
+
+    fn parse_primary_expr(&mut self) -> parser::Return<Spanned<Expr>> {
         let expected_tokens = [
             TokenKind::Integer,
             TokenKind::Float,
@@ -227,8 +219,14 @@ impl<'cx> Parser<'cx> {
                 Ok(expr)
             }
 
+            TokenKind::KwCast => self.parse_cast_expr(),
             TokenKind::LSquare => self.parse_array_literal(),
             TokenKind::LCurly => self.parse_struct_constructor(),
+            TokenKind::Ampersand => {
+                // Reference (&expr)
+                let expr = self.parse_expr()?;
+                Ok(spanned(Expr::Reference(Box::new(expr)), location))
+            }
 
             // Primitives
             TokenKind::Integer
@@ -239,7 +237,22 @@ impl<'cx> Parser<'cx> {
                 let literal = self.parse_literal(&token)?;
                 Ok(spanned(Expr::Literal(literal), location))
             }
-            TokenKind::Ident => self.parse_starting_ident(token.literal.to_string()),
+            TokenKind::Ident => {
+                let location = self.peek().map(|t| t.location).unwrap_or_default();
+                //let expr = self.parse_expr()?;
+                let name = token.literal.to_string();
+
+                match self.peek().map(|t| t.kind) {
+                    Some(TokenKind::LParen) => {
+                        return self.parse_function_call(name);
+                    }
+                    Some(TokenKind::LSquare) => {
+                        let expr = self.parse_expr()?;
+                        return self.parse_array_index(&expr.target);
+                    }
+                    _ => Ok(spanned(Expr::Variable(name), location)),
+                }
+            }
 
             // Unexpected token, return an error
             err => Err(SyntaxError::ExpectedOneOf {

@@ -3,7 +3,7 @@
 //! NOTE: This is extremely buggy and incomplete, and only supports a tiny subset of the language
 //! which is _just_ enough to get us bootstrapped.
 
-use crate::semant::typed_ast::{TBlock, TExpr, TStmt, TToplevelStmt, TypedAst};
+use crate::middle::typed_ast::{TBlock, TExpr, TStmt, TToplevelStmt, TypedAst};
 use crate::syntax::ast::{Literal, Numeric, Ty};
 
 use super::pretty_print::PrettyPrinter;

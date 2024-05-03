@@ -1,7 +1,6 @@
-use super::{
-    lexer::{BinOp, SourceLoc, UnOp},
-    span::*,
-};
+use crate::utils::Spanned;
+
+use super::lexer::{BinOp, SourceLoc, UnOp};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Numeric {
@@ -74,8 +73,8 @@ impl Ty {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Int(i32),
-    Float(f32),
-    Double(f64),
+    Float32(f32),
+    Float64(f64),
     Bool(bool),
     String(String),
 }
@@ -85,6 +84,7 @@ pub enum Expr {
     // Primitive types
     Literal(Literal),
     Variable(String),
+    Reference(Box<Spanned<Expr>>),
 
     // Operations
     BinOp(Box<Spanned<Expr>>, BinOp, Box<Spanned<Expr>>),
@@ -92,6 +92,8 @@ pub enum Expr {
 
     Array(Vec<Spanned<Expr>>),
     Tuple(Vec<Spanned<Expr>>),
+
+    Cast(Box<Spanned<Expr>>, Ty),
 
     StructCons {
         fields: Vec<(String, Spanned<Expr>)>,

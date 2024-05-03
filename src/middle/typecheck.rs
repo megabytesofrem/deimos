@@ -1,13 +1,12 @@
-//! Type checker pass for the AST
+//! Type checker pass for the AST. Produces a typed AST from an untyped AST
 
 use thiserror::Error;
 
+use crate::bubble_err;
 use crate::syntax::ast::Numeric;
+use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
 use crate::syntax::lexer::SourceLoc;
-use crate::syntax::{
-    ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty},
-    span::Spanned,
-};
+use crate::utils::Spanned;
 
 use super::scope::ScopeStack;
 use super::typed_ast::*;
@@ -49,30 +48,18 @@ pub enum TypeError {
 pub(crate) type Return<T> = Result<T, TypeError>;
 pub(crate) type ReturnMany<'cx, T> = anyhow::Result<T, Vec<TypeError>>;
 
-// Macro to return an error while also pushing it to the error list,
-// so we can bubble them up instead of early returning. We do need to `clone` everything when using
-// the macro though.
-#[macro_export]
-macro_rules! bubble_err {
-    ($self:expr, $err:expr) => {
-        let err = $err.clone();
-        $self.errors.push(err);
-        return Err($err);
-    };
-}
-
 // Type checker pass
 #[derive(Debug, Clone)]
-pub struct Typeck<'cx> {
+pub struct Typecheck<'cx> {
     ctx: ScopeStack,
     marker: std::marker::PhantomData<&'cx ()>,
 
     pub errors: Vec<TypeError>,
 }
 
-impl<'cx> Typeck<'cx> {
+impl<'cx> Typecheck<'cx> {
     pub fn new() -> Self {
-        Typeck {
+        Typecheck {
             ctx: ScopeStack::new(),
             marker: std::marker::PhantomData,
             errors: Vec::new(),
@@ -96,14 +83,8 @@ impl<'cx> Typeck<'cx> {
             })
     }
 
-    pub(crate) fn check_literal(&self, literal: &Literal) -> Return<Ty> {
-        match literal {
-            Literal::Int(_) => Ok(Ty::Numeric(Numeric::I32)),
-            Literal::Float(_) => Ok(Ty::Numeric(Numeric::F32)),
-            Literal::Double(_) => Ok(Ty::Numeric(Numeric::F64)),
-            Literal::Bool(_) => Ok(Ty::Bool),
-            Literal::String(_) => Ok(Ty::String),
-        }
+    pub(crate) fn check_literal(&mut self, literal: &Literal) -> Return<Ty> {
+        self.infer_literal(literal)
     }
 
     fn check_expr(&mut self, expr: &Spanned<Expr>) -> Return<Spanned<TExpr>> {
@@ -190,7 +171,7 @@ impl<'cx> Typeck<'cx> {
                 }
                 Stmt::Let { name, ty, value } => {
                     let ty = ty.clone().unwrap_or(Ty::Unknown);
-                    let value = value.as_ref().map(|v| self.check_expr(v));
+                    let value_ = value.as_ref().map(|v| self.check_expr(v));
 
                     // Check if the local is not already defined
                     if self.ctx.get(&name).is_some() {
@@ -203,11 +184,26 @@ impl<'cx> Typeck<'cx> {
                         );
                     }
 
+                    // Check the type being assigned actually makes sense
+                    if let Some(value) = &value {
+                        let value_ty = self.infer_expr(value)?;
+                        if ty != value_ty {
+                            bubble_err!(
+                                self,
+                                TypeError::TypeMismatch {
+                                    expected: ty.clone(),
+                                    found: value_ty.clone(),
+                                    location: value.location.clone(),
+                                }
+                            );
+                        }
+                    }
+
                     self.ctx.insert(name.clone(), ty.clone());
                     Ok(TStmt::Let {
                         name: name.clone(),
                         ty: Some(ty),
-                        value: value.map(|v| v.unwrap()),
+                        value: value_.map(|v| v.unwrap()),
                     })
                 }
                 Stmt::Assign { target, value } => {
@@ -422,7 +418,7 @@ impl<'cx> Typeck<'cx> {
     }
 
     pub fn check(ast: Ast) -> ReturnMany<'cx, TypedAst> {
-        let mut typeck = Typeck::new();
+        let mut typeck = Typecheck::new();
         let mut nodes = Vec::new();
 
         for node in ast.nodes {
@@ -441,7 +437,7 @@ impl<'cx> Typeck<'cx> {
     }
 }
 
-impl Default for Typeck<'_> {
+impl Default for Typecheck<'_> {
     fn default() -> Self {
         Self::new()
     }

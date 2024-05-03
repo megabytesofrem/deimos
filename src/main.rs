@@ -1,8 +1,8 @@
 use std::error::Error;
 
-use deimos::codegen::transpile::Transpiler;
+use deimos::backend::transpile::Transpiler;
+use deimos::middle::typecheck::Typecheck;
 use deimos::parser::Parser;
-use deimos::semant::typechk::Typeck;
 
 fn main() {
     println!("Deimos compiler v0.0.0.2");
@@ -26,7 +26,7 @@ fn drive(src: &str) -> anyhow::Result<()> {
         anyhow::anyhow!("Parsing failed")
     })?;
 
-    let typed_ast = Typeck::check(ast).map_err(|e| {
+    let typed_ast = Typecheck::check(ast).map_err(|e| {
         print_errors(e);
         anyhow::anyhow!("Type checking failed")
     })?;

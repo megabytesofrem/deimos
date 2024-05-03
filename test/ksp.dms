@@ -1,23 +1,13 @@
--- import math
+extern log(arg:f64): f64
 
 -- KSP delta V calculator
-let isp: f32 = 390 -- LV-909 Terrier
-let V_e: f32 = 9.8 * isp -- exhaust velocity
-
-let m0: f32 = 10.0 -- initial mass
-let m1: f32 = 5.0 -- final mass
+let isp: f64 = 390 -- LV-909 Terrier
+let V_e: f64 = 9.8 * isp -- exhaust velocity
+let m0: f64 = 10.0 -- initial mass
+let m1: f64 = 5.0 -- final mass
 -- dV = V_e * ln(m0 / m1)
 
--- function log(x: i32): i32
---     if x == 1.0 then
---         return 0.0
---     end
 
---     let sum: f32 = 0.0
-
---     return result
--- end
-
--- function calc_dV(m0: f32, m1: f32): f32
---     return log(m0 / m1)
--- end
+function calc_dV(m0: f64, m1: f64): f64
+    return log(m0 / m1)
+end

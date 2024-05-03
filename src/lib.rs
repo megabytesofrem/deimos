@@ -1,4 +1,5 @@
-pub mod codegen;
+pub mod backend;
+pub mod middle;
 pub mod parser;
-pub mod semant;
 pub mod syntax;
+pub mod utils;

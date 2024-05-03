@@ -1,7 +1,7 @@
 /// Typed AST representation
 use crate::syntax::ast::{Literal, Ty};
 use crate::syntax::lexer::{BinOp, UnOp};
-use crate::syntax::span::Spanned;
+use crate::utils::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TExpr {

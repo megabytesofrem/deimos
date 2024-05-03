@@ -36,6 +36,8 @@ pub enum TokenKind {
     Question,
     #[token(":")]
     Colon,
+    #[token("&")]
+    Ampersand,
     #[token("=")]
     Equal,
     #[token("!")]
@@ -72,10 +74,12 @@ pub enum TokenKind {
     KwFunction,
     #[token("extern")]
     KwExtern,
+    #[token("module")]
+    KwModule,
     #[token("import")]
     KwImport,
-    #[token("as")]
-    KwAs,
+    #[token("cast")]
+    KwCast,
     #[token("if")]
     KwIf,
     #[token("then")]

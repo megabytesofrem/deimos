@@ -2,23 +2,21 @@
 //! This is split from `typechk.rs` to keep the codebase clean and organized
 
 use crate::bubble_err;
-use crate::semant::typechk::Typeck;
+use crate::middle::typecheck::Typecheck;
+use crate::syntax::ast::{Expr, Literal, Numeric, Ty};
 use crate::syntax::lexer::{BinOp, SourceLoc};
-use crate::syntax::{
-    ast::{Expr, Literal, Numeric, Ty},
-    span::Spanned,
-};
+use crate::utils::Spanned;
 
-use super::typechk::{self, TypeError};
+use super::typecheck::{self, TypeError};
 
-impl<'cx> Typeck<'cx> {
+impl<'cx> Typecheck<'cx> {
     // Inference functions
 
-    pub(crate) fn infer_literal(&mut self, lit: &Literal) -> typechk::Return<Ty> {
+    pub(crate) fn infer_literal(&mut self, lit: &Literal) -> typecheck::Return<Ty> {
         match lit {
             Literal::Int(_) => Ok(Ty::Numeric(Numeric::I32)),
-            Literal::Float(_) => Ok(Ty::Numeric(Numeric::F32)),
-            Literal::Double(_) => Ok(Ty::Numeric(Numeric::F64)),
+            Literal::Float32(_) => Ok(Ty::Numeric(Numeric::F32)),
+            Literal::Float64(_) => Ok(Ty::Numeric(Numeric::F64)),
             Literal::Bool(_) => Ok(Ty::Bool),
             Literal::String(_) => Ok(Ty::String),
         }
@@ -29,7 +27,7 @@ impl<'cx> Typeck<'cx> {
         lhs: &Spanned<Expr>,
         op: BinOp,
         rhs: &Spanned<Expr>,
-    ) -> typechk::Return<Ty> {
+    ) -> typecheck::Return<Ty> {
         let lhs_ty = self.infer_expr(lhs)?;
         let rhs_ty = self.infer_expr(rhs)?;
 
@@ -74,7 +72,7 @@ impl<'cx> Typeck<'cx> {
         &mut self,
         name: String,
         args: &Vec<Spanned<Expr>>,
-    ) -> typechk::Return<Ty> {
+    ) -> typecheck::Return<Ty> {
         let callee =
             self.get_context()
                 .get(&name)
@@ -128,7 +126,7 @@ impl<'cx> Typeck<'cx> {
         }
     }
 
-    pub(crate) fn infer_array(&mut self, elems: &[Spanned<Expr>]) -> typechk::Return<Ty> {
+    pub(crate) fn infer_array(&mut self, elems: &[Spanned<Expr>]) -> typecheck::Return<Ty> {
         if elems.is_empty() {
             return Ok(Ty::Array(Box::new(Ty::Unknown)));
         }
@@ -153,7 +151,7 @@ impl<'cx> Typeck<'cx> {
         Ok(Ty::Array(Box::new(elem_ty)))
     }
 
-    pub(crate) fn infer_tuple(&mut self, elems: &[Spanned<Expr>]) -> typechk::Return<Ty> {
+    pub(crate) fn infer_tuple(&mut self, elems: &[Spanned<Expr>]) -> typecheck::Return<Ty> {
         let mut tys = Vec::new();
         for elem in elems {
             tys.push(self.infer_expr(elem)?);
@@ -166,7 +164,7 @@ impl<'cx> Typeck<'cx> {
         &mut self,
         indexable: &Spanned<Expr>,
         index: &Spanned<Expr>,
-    ) -> typechk::Return<Ty> {
+    ) -> typecheck::Return<Ty> {
         let indexable_ty = self.infer_expr(indexable)?;
         let index_ty = self.infer_expr(index)?;
 
@@ -196,7 +194,7 @@ impl<'cx> Typeck<'cx> {
         }
     }
 
-    pub(crate) fn infer_expr(&mut self, expr: &Spanned<Expr>) -> typechk::Return<Ty> {
+    pub(crate) fn infer_expr(&mut self, expr: &Spanned<Expr>) -> typecheck::Return<Ty> {
         match &expr.target {
             Expr::Literal(lit) => self.check_literal(lit),
             Expr::Variable(name) => self.check_variable(name, expr.location.clone()),

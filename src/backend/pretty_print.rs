@@ -1,4 +1,4 @@
-use crate::semant::typed_ast::{TBlock, TExpr, TStmt, TToplevelStmt, TypedAst};
+use crate::middle::typed_ast::{TBlock, TExpr, TStmt, TToplevelStmt, TypedAst};
 use crate::syntax::ast::{Literal, Numeric, Ty};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,7 +34,7 @@ impl PrettyPrinter {
         self.indent.truncate(self.indent.len() - 4); // Remove the last 4 spaces
     }
 
-    fn to_typename(&mut self, ty: Ty) -> String {
+    pub(crate) fn to_typename(&mut self, ty: &Ty) -> String {
         match ty {
             Ty::Numeric(Numeric::I16) => "i16".to_string(),
             Ty::Numeric(Numeric::I32) => "i32".to_string(),
@@ -49,19 +49,19 @@ impl PrettyPrinter {
             // TODO: Later on replace with the proper, native string type
             Ty::String => "char *".to_string(),
             Ty::Void => "void".to_string(),
-            Ty::Function(ret_ty, params) => self.gen_function_pointer(*ret_ty, params),
-            Ty::Array(ty) => format!("{}*", self.to_typename(*ty)),
-            Ty::Pointer(ty) => format!("{}*", self.to_typename(*ty)),
-            Ty::UserDefined(name) => name,
+            Ty::Function(ret_ty, params) => self.gen_function_pointer(ret_ty, &params),
+            Ty::Array(ty) => format!("{}*", self.to_typename(ty)),
+            Ty::Pointer(ty) => format!("{}*", self.to_typename(ty)),
+            Ty::UserDefined(name) => name.to_string(),
             _ => unimplemented!("typename"),
         }
     }
 
-    fn gen_function_pointer(&mut self, ret_ty: Ty, params: Vec<Ty>) -> String {
+    fn gen_function_pointer(&mut self, ret_ty: &Ty, params: &Vec<Ty>) -> String {
         let mut code = String::new();
         code.push_str("(");
         for (index, param) in params.iter().enumerate() {
-            code.push_str(&self.to_typename(param.clone()));
+            code.push_str(&self.to_typename(param));
 
             if index < params.len() - 1 {
                 code.push_str(", ");
@@ -76,8 +76,8 @@ impl PrettyPrinter {
     fn gen_literal(&mut self, lit: &Literal) -> String {
         match lit {
             Literal::Int(i) => i.to_string(),
-            Literal::Float(f) => f.to_string(),
-            Literal::Double(d) => d.to_string(),
+            Literal::Float32(f) => f.to_string(),
+            Literal::Float64(d) => d.to_string(),
             Literal::Bool(b) => b.to_string(),
             Literal::String(s) => format!("{:?}", s),
         }
@@ -146,7 +146,7 @@ impl PrettyPrinter {
                 format!("return {};", expr_str)
             }
             TStmt::Let { name, ty, value } => {
-                let ty_str = self.to_typename(ty.clone().unwrap_or(Ty::Void));
+                let ty_str = self.to_typename(&ty.clone().unwrap_or(Ty::Void));
                 let value_str = value
                     .as_ref()
                     .map(|v| self.gen_expr(&v.target))
@@ -206,13 +206,13 @@ impl PrettyPrinter {
             } => {
                 let params_str = params
                     .iter()
-                    .map(|(name, ty)| format!("{} {}", self.to_typename(ty.clone()), name))
+                    .map(|(name, ty)| format!("{} {}", self.to_typename(ty), name))
                     .collect::<Vec<String>>()
                     .join(", ");
                 let body_str = self.gen_block(body);
                 format!(
                     "{} {} ({}) {}",
-                    self.to_typename(return_ty.clone()),
+                    self.to_typename(return_ty),
                     name,
                     params_str,
                     body_str
@@ -225,14 +225,14 @@ impl PrettyPrinter {
             } => {
                 let params_str = params
                     .iter()
-                    .map(|(name, ty)| format!("{} {}", self.to_typename(ty.clone()), name))
+                    .map(|(name, ty)| format!("{} {}", self.to_typename(ty), name))
                     .collect::<Vec<String>>()
                     .join(", ");
 
                 // Add a comment marking the extern declaration to track it in the generated code
                 format!(
-                    "// extern {} {} ({})",
-                    self.to_typename(return_ty.clone()),
+                    "// extern {} {} ({})\n",
+                    self.to_typename(return_ty),
                     name,
                     params_str
                 )

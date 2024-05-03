@@ -1,11 +1,12 @@
-//! Parsing of statements, blocks and top-level statements.
+//! Parsing of statements and blocks.
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
+use crate::backend::module_info::ModuleInfo;
 use crate::parser;
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{Token, TokenKind};
-use crate::syntax::span::{spanned, Spanned};
+use crate::utils::{spanned, Spanned};
 
 use super::Parser;
 
@@ -245,6 +246,7 @@ impl<'cx> Parser<'cx> {
         Ok(spanned(Stmt::Return(expr), token.location))
     }
 
+    // Top-level statement parser
     pub(crate) fn parse_toplevel_stmt(&mut self) -> parser::Return<ToplevelStmt> {
         let result = match self.peek() {
             Some(token) => match token.kind {
@@ -276,8 +278,23 @@ impl<'cx> Parser<'cx> {
         result
     }
 
+    fn parse_module_declare(&mut self) -> parser::Return<ToplevelStmt> {
+        // module name
+        //    functions
+        // end
+        let token = self.expect(TokenKind::KwModule)?;
+        let name = self.expect(TokenKind::Ident)?;
+
+        let mut module_info = ModuleInfo::new(name.literal.to_string());
+
+        todo!("Implement module parsing")
+    }
+
     fn parse_extern_declare(&mut self) -> parser::Return<ToplevelStmt> {
         // External functions imported from C
+        //
+        // Expect these to be replaced with modules which support namespacing _very_ soon
+        // because they only exist as a quick and dirty FFI hack.
 
         // extern cfunction_name(param:type, param:type, ...): return_type?
         let mut return_type: Ty = Ty::Void;

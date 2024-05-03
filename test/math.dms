@@ -1,0 +1,17 @@
+extern powc(x:f32,y:f32): f32
+extern printc(string:string): void
+extern printi(number:i32): void
+
+function square(x:f32): f32
+    return powc(x, 2.0)
+end
+
+function main()
+    printc("Hello world")
+    let squared:f32 = square(2.0)
+
+    let a_num:i32 = 69
+    if squared == 4.0 then
+        printi(a_num)
+    end
+end
