@@ -118,7 +118,7 @@ impl<'p> Parser<'p> {
         Ok(spanned(
             Stmt::Assign {
                 target: spanned(
-                    Expr::Variable(ident.literal.to_string()),
+                    Expr::Name(ident.literal.to_string()),
                     ident.location.clone(),
                 ),
                 value: expr,
@@ -300,6 +300,7 @@ impl<'p> Parser<'p> {
         // extern cfunction_name(param:type, param:type, ...): return_type?
         let mut return_type: Ty = Ty::Void;
         self.expect(TokenKind::KwExtern)?;
+        self.expect(TokenKind::KwFunction)?;
         let name = self.expect(TokenKind::Ident)?;
 
         self.expect(TokenKind::LParen)?;
@@ -343,7 +344,6 @@ impl<'p> Parser<'p> {
             if let Some(token) = self.peek() {
                 if token.kind != TokenKind::KwEnd {
                     self.expect(TokenKind::Comma)?;
-                    break;
                 }
             }
         }
@@ -374,7 +374,6 @@ impl<'p> Parser<'p> {
             if let Some(token) = self.peek() {
                 if token.kind != TokenKind::KwEnd {
                     self.expect(TokenKind::Comma)?;
-                    break;
                 }
             }
         }

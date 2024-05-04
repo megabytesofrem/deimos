@@ -86,7 +86,7 @@ impl PrettyPrinter {
     fn gen_expr(&mut self, expr: &TExpr) -> String {
         match expr {
             TExpr::Literal(lit, _) => self.gen_literal(lit),
-            TExpr::Variable(name, _) => name.clone(),
+            TExpr::Name(name, _) => name.clone(),
             TExpr::BinOp(lhs, op, rhs) => {
                 let lhs_str = self.gen_expr(&lhs.target);
                 let rhs_str = self.gen_expr(&rhs.target);
@@ -235,6 +235,21 @@ impl PrettyPrinter {
                     self.to_typename(return_ty),
                     name,
                     params_str
+                )
+            }
+            TToplevelStmt::EnumDecl { name, fields } => {
+                let fields_str = fields.join(", ");
+                format!("typedef enum {} {{\n {} \n}} {}; ", name, fields_str, name)
+            }
+            TToplevelStmt::StructDecl { name, fields } => {
+                let fields_str = fields
+                    .iter()
+                    .map(|(name, ty)| format!("{} {}", self.to_typename(ty), name))
+                    .collect::<Vec<String>>()
+                    .join(";\n");
+                format!(
+                    "typedef struct {} {{\n {} \n}} {}; ",
+                    name, fields_str, name
                 )
             }
 

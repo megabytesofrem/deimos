@@ -38,14 +38,3 @@ impl<T> Spanned<T> {
         })
     }
 }
-
-/// Macro to return an error while also pushing it to the error list, so we can bubble them up
-/// instead of returning early. We do need to `clone` everything when using the macro though.
-#[macro_export]
-macro_rules! bubble_err {
-    ($self:expr, $err:expr) => {
-        let err = $err.clone();
-        $self.errors.push(err);
-        return Err($err);
-    };
-}

@@ -1,9 +1,9 @@
-extern powc(x:f32,y:f32): f32
-extern printc(string:string): void
-extern printi(number:i32): void
+extern function powc(x:f32,y:f32): f32
+extern function printc(string:string): void
+extern function printi(number:i32): void
 
 function square(x:f32): f32
-    return powc(x, 2.0)
+    return x * x
 end
 
 function main()

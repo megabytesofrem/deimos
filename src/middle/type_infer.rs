@@ -1,7 +1,6 @@
 //! Inference functions for type checking
 //! This is split from `typechk.rs` to keep the codebase clean and organized
 
-use crate::bubble_err;
 use crate::middle::typecheck::Typecheck;
 use crate::syntax::ast::{Expr, Literal, Numeric, Ty};
 use crate::syntax::lexer::{BinOp, SourceLoc};
@@ -32,27 +31,21 @@ impl<'tc> Typecheck<'tc> {
         let rhs_ty = self.infer_expr(rhs)?;
 
         if lhs_ty != rhs_ty {
-            bubble_err!(
-                self,
-                TypeError::TypeMismatch {
-                    expected: lhs_ty.clone(),
-                    found: rhs_ty.clone(),
-                    location: lhs.location.clone(),
-                }
-            );
+            return Err(TypeError::TypeMismatch {
+                expected: lhs_ty.clone(),
+                found: rhs_ty.clone(),
+                location: lhs.location.clone(),
+            });
         }
 
         match op {
             BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
                 if !lhs_ty.is_numeric() && rhs_ty != lhs_ty {
-                    bubble_err!(
-                        self,
-                        TypeError::TypeMismatch {
-                            expected: lhs_ty.clone(),
-                            found: rhs_ty.clone(),
-                            location: lhs.location.clone(),
-                        }
-                    );
+                    return Err(TypeError::TypeMismatch {
+                        expected: lhs_ty.clone(),
+                        found: rhs_ty.clone(),
+                        location: lhs.location.clone(),
+                    });
                 }
 
                 Ok(lhs_ty)
@@ -85,42 +78,33 @@ impl<'tc> Typecheck<'tc> {
             Ty::Function(return_ty, param_tys) => {
                 // Make sure the number of arguments match the number of parameters
                 if args.len() != param_tys.len() {
-                    bubble_err!(
-                        self,
-                        TypeError::ArityMismatch {
-                            expected: param_tys.len(),
-                            found: args.len(),
-                            location: SourceLoc::default(),
-                        }
-                    );
+                    return Err(TypeError::ArityMismatch {
+                        expected: param_tys.len(),
+                        found: args.len(),
+                        location: SourceLoc::default(),
+                    });
                 }
 
                 // Check if the types of the arguments match the types of the parameters
                 for (arg, param_ty) in args.iter().zip(param_tys.iter()) {
                     let arg_ty = self.infer_expr(arg)?;
                     if arg_ty != *param_ty {
-                        bubble_err!(
-                            self,
-                            TypeError::TypeMismatch {
-                                expected: param_ty.clone(),
-                                found: arg_ty.clone(),
-                                location: arg.location.clone(),
-                            }
-                        );
+                        return Err(TypeError::TypeMismatch {
+                            expected: param_ty.clone(),
+                            found: arg_ty.clone(),
+                            location: arg.location.clone(),
+                        });
                     }
                 }
 
                 return Ok(*return_ty);
             }
             _ => {
-                bubble_err!(
-                    self,
-                    TypeError::TypeMismatch {
-                        expected: Ty::Function(Box::new(Ty::Unchecked), Vec::new()),
-                        found: callee.clone(),
-                        location: SourceLoc::default(),
-                    }
-                );
+                return Err(TypeError::TypeMismatch {
+                    expected: Ty::Function(Box::new(Ty::Unchecked), Vec::new()),
+                    found: callee.clone(),
+                    location: SourceLoc::default(),
+                });
             }
         }
     }
@@ -135,14 +119,11 @@ impl<'tc> Typecheck<'tc> {
         elems.iter().skip(1).try_for_each(|elem| {
             let ty = self.infer_expr(elem)?;
             if ty != elem_ty {
-                bubble_err!(
-                    self,
-                    TypeError::TypeMismatch {
-                        expected: elem_ty.clone(),
-                        found: ty.clone(),
-                        location: elem.location.clone(),
-                    }
-                );
+                return Err(TypeError::TypeMismatch {
+                    expected: elem_ty.clone(),
+                    found: ty.clone(),
+                    location: elem.location.clone(),
+                });
             }
             Ok(())
         })?;
@@ -169,40 +150,36 @@ impl<'tc> Typecheck<'tc> {
 
         // Check if `index_ty` is a valid index type or not
         if !index_ty.is_index_type() {
-            bubble_err!(
-                self,
-                TypeError::TypeMismatch {
-                    expected: Ty::Numeric(Numeric::I32),
-                    found: index_ty.clone(),
-                    location: index.location.clone(),
-                }
-            );
+            return Err(TypeError::TypeMismatch {
+                expected: Ty::Numeric(Numeric::I32),
+                found: index_ty.clone(),
+                location: index.location.clone(),
+            });
         }
 
         match indexable_ty {
             Ty::Array(ty) => Ok(*ty),
 
-            #[rustfmt::skip]
-        _ => {
-            bubble_err!(self, TypeError::TypeMismatch {
-                expected: Ty::Array(Box::new(Ty::Unchecked)),
-                found: indexable_ty.clone(),
-                location: indexable.location.clone(),
-            });
-        }
+            _ => {
+                return Err(TypeError::TypeMismatch {
+                    expected: Ty::Array(Box::new(Ty::Unchecked)),
+                    found: indexable_ty.clone(),
+                    location: indexable.location.clone(),
+                });
+            }
         }
     }
 
     pub(crate) fn infer_expr(&mut self, expr: &Spanned<Expr>) -> typecheck::Return<Ty> {
         match &expr.target {
             Expr::Literal(lit) => self.check_literal(lit),
-            Expr::Variable(name) => self.check_variable(name, expr.location.clone()),
+            Expr::Name(name) => self.check_variable(name, expr.location.clone()),
             Expr::BinOp(lhs, op, rhs) => self.infer_binop(lhs, op.clone(), rhs),
             Expr::Array(elems) => self.infer_array(elems),
             Expr::Tuple(elems) => self.infer_tuple(elems),
             Expr::ArrayIndex { array, index } => self.infer_arraylike_index(array, index),
             Expr::Call { callee, args } => match &callee.target {
-                Expr::Variable(name) => self.infer_function_call(name.clone(), args),
+                Expr::Name(name) => self.infer_function_call(name.clone(), args),
 
                 // Cannot call functions on anything other than variables
                 _ => unimplemented!(),

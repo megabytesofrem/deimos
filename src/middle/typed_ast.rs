@@ -7,7 +7,7 @@ use crate::utils::Spanned;
 pub enum TExpr {
     // Primitive types
     Literal(Literal, Ty),
-    Variable(String, Ty),
+    Name(String, Ty),
 
     // Operations
     BinOp(Box<Spanned<TExpr>>, BinOp, Box<Spanned<TExpr>>),

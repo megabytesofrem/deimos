@@ -84,7 +84,7 @@ pub enum Literal {
 pub enum Expr {
     // Primitive types
     Literal(Literal),
-    Variable(String),
+    Name(String),
     Reference(Box<Spanned<Expr>>),
 
     // Operations

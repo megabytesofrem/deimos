@@ -1,10 +1,17 @@
 //! Lexical analysis pass using `logos` crate
-use std::iter::Peekable;
+use core::fmt;
+use std::{iter::Peekable, ops::Range};
 
 use logos::{Logos, SpannedIter};
 
 /// Report locations in the source code
-pub type SourceLoc = std::ops::Range<usize>;
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SourceLoc {
+    pub line: usize,
+
+    pub start: usize,
+    pub end: usize,
+}
 
 #[derive(Debug, Clone, PartialEq, Logos)]
 pub enum TokenKind {
@@ -212,6 +219,44 @@ pub struct TokenIter<'a> {
     src: &'a str,
 }
 
+impl fmt::Display for SourceLoc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(L{}, C{}:{})", self.line, self.start, self.end)
+    }
+}
+
+impl<'a> TokenIter<'a> {
+    // Return the correct location of the token accounting for newlines by using the
+    // inner span and directly counting the characters in the source string.
+    fn get_location(&self) -> SourceLoc {
+        let span = self.inner.span();
+        let start = span.start;
+        let end = span.end;
+
+        let mut line = 1;
+        let mut col = 0;
+
+        for (i, c) in self.src.chars().enumerate() {
+            if i == start {
+                break;
+            }
+
+            if c == '\n' {
+                line += 1;
+                col = 0;
+            } else {
+                col += 1;
+            }
+        }
+
+        SourceLoc {
+            line,
+            start: col,
+            end: col + (end - start),
+        }
+    }
+}
+
 impl<'a> Iterator for TokenIter<'a> {
     type Item = Token<'a>;
 
@@ -221,7 +266,7 @@ impl<'a> Iterator for TokenIter<'a> {
             .map(|(kind, span)| {
                 Some(Token {
                     kind: kind.ok()?,
-                    location: span.start..span.end,
+                    location: self.get_location(),
                     literal: &self.src[span],
                 })
             })

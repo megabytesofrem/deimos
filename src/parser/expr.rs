@@ -164,7 +164,7 @@ impl<'p> Parser<'p> {
 
         Ok(spanned(
             Expr::Call {
-                callee: Box::new(spanned(Expr::Variable(name), location.clone())),
+                callee: Box::new(spanned(Expr::Name(name), location.clone())),
                 args,
             },
             location,
@@ -250,7 +250,7 @@ impl<'p> Parser<'p> {
                         let expr = self.parse_expr()?;
                         return self.parse_array_index(&expr.target);
                     }
-                    _ => Ok(spanned(Expr::Variable(name), location)),
+                    _ => Ok(spanned(Expr::Name(name), location)),
                 }
             }
 

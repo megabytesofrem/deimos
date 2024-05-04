@@ -2,7 +2,6 @@
 
 use thiserror::Error;
 
-use crate::bubble_err;
 use crate::syntax::ast::Numeric;
 use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
 use crate::syntax::lexer::SourceLoc;
@@ -11,32 +10,32 @@ use crate::utils::Spanned;
 use super::name_resolver::ScopeStack;
 use super::typed_ast::*;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum TypeError {
-    #[error("{location:?}: Type mismatch between '{expected:?}' and '{found:?}'")]
+    #[error("{location}: Type mismatch between '{expected:?}' and '{found:?}'")]
     TypeMismatch {
         expected: Ty,
         found: Ty,
         location: SourceLoc,
     },
 
-    #[error("{location:?}: Redefinition of variable or type '{name}'")]
+    #[error("{location}: Redefinition of variable or type '{name}'")]
     Redefinition { name: String, location: SourceLoc },
 
-    #[error("{location:?}: Undefined local '{name}' being used before declaration")]
+    #[error("{location}: Undefined local '{name}' being used before declaration")]
     UndefinedLocal { name: String, location: SourceLoc },
 
-    #[error("{location:?}: Undefined function '{name}' being used before declaration")]
+    #[error("{location}: Undefined function '{name}' being used before declaration")]
     UndefinedFunction { name: String, location: SourceLoc },
 
-    #[error("{location:?}: Arity mismatch between '{expected}' and '{found}'")]
+    #[error("{location}: Arity mismatch between '{expected}' and '{found}'")]
     ArityMismatch {
         expected: usize,
         found: usize,
         location: SourceLoc,
     },
 
-    #[error("{location:?}: Return type mismatch between '{expected:?}' and '{found:?}'")]
+    #[error("{location}: Return type mismatch between '{expected:?}' and '{found:?}'")]
     ReturnTypeMismatch {
         expected: Ty,
         found: Ty,
@@ -92,20 +91,17 @@ impl<'tc> Typecheck<'tc> {
                 Expr::Literal(lit) => {
                     return Ok(TExpr::Literal(lit.clone(), ty.clone()));
                 }
-                Expr::Variable(name) => {
+                Expr::Name(name) => {
                     let ty2 = self.check_variable(&name, expr.location.clone())?;
                     if ty != ty2 {
-                        bubble_err!(
-                            self,
-                            TypeError::TypeMismatch {
-                                expected: ty.clone(),
-                                found: ty2.clone(),
-                                location: expr.location.clone(),
-                            }
-                        );
+                        return Err(TypeError::TypeMismatch {
+                            expected: ty.clone(),
+                            found: ty2.clone(),
+                            location: expr.location.clone(),
+                        });
                     } else {
                         // Variable is valid
-                        return Ok(TExpr::Variable(name.clone(), ty.clone()));
+                        return Ok(TExpr::Name(name.clone(), ty.clone()));
                     }
                 }
                 Expr::BinOp(lhs, op, rhs) => {
@@ -172,27 +168,21 @@ impl<'tc> Typecheck<'tc> {
 
                     // Check if the local is not already defined
                     if self.ctx.get(&name).is_some() {
-                        bubble_err!(
-                            self,
-                            TypeError::Redefinition {
-                                name: name.clone(),
-                                location: stmt.location.clone(),
-                            }
-                        );
+                        return Err(TypeError::Redefinition {
+                            name: name.clone(),
+                            location: stmt.location.clone(),
+                        });
                     }
 
                     // Check the type being assigned actually makes sense
                     if let Some(value) = &value {
                         let value_ty = self.infer_expr(value)?;
                         if ty != value_ty {
-                            bubble_err!(
-                                self,
-                                TypeError::TypeMismatch {
-                                    expected: ty.clone(),
-                                    found: value_ty.clone(),
-                                    location: value.location.clone(),
-                                }
-                            );
+                            return Err(TypeError::TypeMismatch {
+                                expected: ty.clone(),
+                                found: value_ty.clone(),
+                                location: value.location.clone(),
+                            });
                         }
                     }
 
@@ -208,14 +198,11 @@ impl<'tc> Typecheck<'tc> {
                     let value_ty = self.infer_expr(&value)?;
 
                     if target_ty != value_ty {
-                        bubble_err!(
-                            self,
-                            TypeError::TypeMismatch {
-                                expected: target_ty.clone(),
-                                found: value_ty.clone(),
-                                location: value.location.clone(),
-                            }
-                        );
+                        return Err(TypeError::TypeMismatch {
+                            expected: target_ty.clone(),
+                            found: value_ty.clone(),
+                            location: value.location.clone(),
+                        });
                     }
 
                     Ok(TStmt::Assign {
@@ -263,13 +250,10 @@ impl<'tc> Typecheck<'tc> {
     ) -> Return<TToplevelStmt> {
         // Check if the function is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(
-                self,
-                TypeError::Redefinition {
-                    name: name.to_string(),
-                    location: SourceLoc::default(),
-                }
-            );
+            return Err(TypeError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
         }
 
         // Insert the function into the context
@@ -298,13 +282,10 @@ impl<'tc> Typecheck<'tc> {
     ) -> Return<TToplevelStmt> {
         // Check if the struct is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(
-                self,
-                TypeError::Redefinition {
-                    name: name.to_string(),
-                    location: SourceLoc::default(),
-                }
-            );
+            return Err(TypeError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
         }
 
         // Insert the struct into the context
@@ -319,13 +300,10 @@ impl<'tc> Typecheck<'tc> {
     fn check_enum_declare(&mut self, name: &str, fields: &[String]) -> Return<TToplevelStmt> {
         // Check if the enum is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(
-                self,
-                TypeError::Redefinition {
-                    name: name.to_string(),
-                    location: SourceLoc::default(),
-                }
-            );
+            return Err(TypeError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
         }
 
         // Insert the enum into the context
@@ -351,13 +329,10 @@ impl<'tc> Typecheck<'tc> {
     ) -> Return<TToplevelStmt> {
         // Check if the function is not already defined
         if self.ctx.get(name).is_some() {
-            bubble_err!(
-                self,
-                TypeError::Redefinition {
-                    name: name.to_string(),
-                    location: SourceLoc::default(),
-                }
-            );
+            return Err(TypeError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
         }
 
         // Insert the function into the context

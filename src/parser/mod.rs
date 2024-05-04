@@ -56,6 +56,9 @@ impl<'p> Parser<'p> {
         let token = self.peek().ok_or(SyntaxError::UnexpectedEof)?;
         if token.kind == kind {
             Ok(token)
+        } else if token.kind == TokenKind::Comment {
+            // Skip comments and try again
+            self.expect(kind)
         } else {
             let err = SyntaxError::UnexpectedToken {
                 token: token.kind,
@@ -73,6 +76,9 @@ impl<'p> Parser<'p> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         if token.kind == kind {
             Ok(token)
+        } else if token.kind == TokenKind::Comment {
+            // Skip comments and try again
+            self.expect(kind)
         } else {
             let err = SyntaxError::UnexpectedToken {
                 token: token.kind,
@@ -89,6 +95,9 @@ impl<'p> Parser<'p> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         if kinds.contains(&token.kind) {
             Ok(token)
+        } else if token.kind == TokenKind::Comment {
+            // Skip comments and try again
+            self.expect_one_of(kinds)
         } else {
             let err = SyntaxError::UnexpectedToken {
                 token: token.kind,

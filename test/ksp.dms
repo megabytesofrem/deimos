@@ -1,13 +1,13 @@
-extern log(arg:f64): f64
+extern function log(arg:f64): f64
 
 -- KSP delta V calculator
-let isp: f64 = 390 -- LV-909 Terrier
+let isp: f64 = 390.0 -- LV-909 Terrier
 let V_e: f64 = 9.8 * isp -- exhaust velocity
 let m0: f64 = 10.0 -- initial mass
 let m1: f64 = 5.0 -- final mass
 -- dV = V_e * ln(m0 / m1)
 
 
-function calc_dV(m0: f64, m1: f64): f64
-    return log(m0 / m1)
-end
+-- function calc_dV(m0: f64, m1: f64): f64
+--     return log(m0 / m1)
+-- end
