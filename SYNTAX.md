@@ -19,6 +19,8 @@ Generics are not supported yet.
 - `extern` is used to mark a function, or type as externally defined from C. 
 - `import` is used to import a file
 
+⚠️ `extern` will be deprecated soon when modules are added, and will be repurposed as a modifier keyword.
+
 Consider the below snippet which could be part of a bridge to a C API, like SDL2.
 ```lua
 let SDL_INIT_VIDEO: u32 = 0x00000020
@@ -79,12 +81,23 @@ function quote_armstrong()
 ```
 
 ## Modules
+Modules are a way to store related functions and variables (usually constants). 
+Modules are desugared at compile-time and are the future replacement for the `extern` keyword, due
+to them supporting a limited form of namespacing (as of current, modules cannot contain nested modules).
+
 ```lua
-module summer
-    function sum_ints(a:i32, b:i32):i32
+module mathy
+    let PI: f32 = 3.14159
+
+    function sum(a:i32, b:i32):i32
         return a + b
     end
-end
-```
 
-Modules are a way to store related functions and **constant** variables.
+    -- csquare is defined externally in C, called mathy_csquare (read above for why)
+    extern function csquare(n:i32): i322    
+end
+
+-- Usage:
+let value_of_pi: f32 = mathy::PI
+let sum: i32 = mathy::sum(1, 2)
+```
