@@ -78,7 +78,7 @@ impl TokenKind {
     }
 }
 
-impl<'cx> Parser<'cx> {
+impl<'p> Parser<'p> {
     fn parse_expr_prec(&mut self, min_prec: u8) -> parser::Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let mut lhs = self.parse_primary_expr()?;

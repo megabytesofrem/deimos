@@ -9,7 +9,7 @@ use crate::syntax::lexer::TokenKind;
 use super::Parser;
 type Param = (String, Ty);
 
-impl<'cx> Parser<'cx> {
+impl<'p> Parser<'p> {
     pub(crate) fn parse_type(&mut self) -> parser::Return<Ty> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         match token.kind {

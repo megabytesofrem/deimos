@@ -14,14 +14,14 @@ use crate::syntax::ast::Ty;
 
 use super::pretty_print::PrettyPrinter;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionInfo {
     pub name: String,
     pub args: Vec<(String, Ty)>,
     pub return_type: Ty,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModuleInfo {
     pp: PrettyPrinter,
 
@@ -38,6 +38,10 @@ impl ModuleInfo {
         }
     }
 
+    pub fn get_function(&self, name: &str) -> Option<&FunctionInfo> {
+        self.functions.iter().find(|f| f.name == name)
+    }
+
     pub fn add_function(&mut self, name: String, args: Vec<(String, Ty)>, return_type: Ty) {
         self.functions.push(FunctionInfo {
             name,
@@ -46,7 +50,12 @@ impl ModuleInfo {
         });
     }
 
-    // Transpile a `ModuleInfo` struct to a C header file
+    fn prefix_module_name(&self, module_name: &str, func_name: &str) -> String {
+        format!("{}_{}", module_name, func_name)
+    }
+
+    // Transpile the `ModuleInfo` into a C header file. Each module contains a `ModuleInfo` which
+    // contains the structure of the module, including the function signatures.
     pub fn compile_header(&mut self) -> String {
         let module_name = self.name.to_uppercase();
         let comment_string = format!("// Generated header for module: {}\n", self.name);
@@ -61,7 +70,8 @@ impl ModuleInfo {
             prototype.push_str(&format!(
                 "{} {}(",
                 self.pp.to_typename(&func.return_type),
-                func.name
+                // Prefix the function name with the module name
+                self.prefix_module_name(&self.name, &func.name)
             ));
 
             for (i, (arg_name, arg_ty)) in func.args.iter().enumerate() {
@@ -79,5 +89,14 @@ impl ModuleInfo {
         self.pp.emit_line("#endif");
 
         self.pp.lines.join("\n")
+    }
+}
+
+impl From<FunctionInfo> for Ty {
+    fn from(func: FunctionInfo) -> Self {
+        Ty::Function(
+            Box::new(func.return_type),
+            func.args.iter().map(|(_, ty)| ty.clone()).collect(),
+        )
     }
 }

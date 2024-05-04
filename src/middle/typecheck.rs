@@ -8,7 +8,7 @@ use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
 use crate::syntax::lexer::SourceLoc;
 use crate::utils::Spanned;
 
-use super::scope::ScopeStack;
+use super::name_resolver::ScopeStack;
 use super::typed_ast::*;
 
 #[derive(Debug, Clone, Error)]
@@ -45,19 +45,19 @@ pub enum TypeError {
 }
 
 // Holds the type that is returned from the type checker
-pub(crate) type Return<T> = Result<T, TypeError>;
+pub(crate) type Return<T> = anyhow::Result<T, TypeError>;
 pub(crate) type ReturnMany<'cx, T> = anyhow::Result<T, Vec<TypeError>>;
 
 // Type checker pass
 #[derive(Debug, Clone)]
-pub struct Typecheck<'cx> {
+pub struct Typecheck<'tc> {
     ctx: ScopeStack,
-    marker: std::marker::PhantomData<&'cx ()>,
+    marker: std::marker::PhantomData<&'tc ()>,
 
     pub errors: Vec<TypeError>,
 }
 
-impl<'cx> Typecheck<'cx> {
+impl<'tc> Typecheck<'tc> {
     pub fn new() -> Self {
         Typecheck {
             ctx: ScopeStack::new(),
@@ -66,7 +66,7 @@ impl<'cx> Typecheck<'cx> {
         }
     }
 
-    pub(crate) fn get_context(&self) -> &ScopeStack {
+    pub(crate) fn get_typing_context(&self) -> &ScopeStack {
         &self.ctx
     }
 
@@ -74,13 +74,10 @@ impl<'cx> Typecheck<'cx> {
     // NOTE: We operate on the AST wrapped in Spanned<T>
 
     pub(crate) fn check_variable(&self, name: &str, location: SourceLoc) -> Return<Ty> {
-        self.ctx
-            .get(name)
-            .cloned()
-            .ok_or_else(|| TypeError::UndefinedLocal {
-                name: name.to_string(),
-                location,
-            })
+        self.ctx.get(name).ok_or_else(|| TypeError::UndefinedLocal {
+            name: name.to_string(),
+            location,
+        })
     }
 
     pub(crate) fn check_literal(&mut self, literal: &Literal) -> Return<Ty> {
@@ -170,7 +167,7 @@ impl<'cx> Typecheck<'cx> {
                     Ok(TStmt::Return(None))
                 }
                 Stmt::Let { name, ty, value } => {
-                    let ty = ty.clone().unwrap_or(Ty::Unknown);
+                    let ty = ty.clone().unwrap_or(Ty::Unchecked);
                     let value_ = value.as_ref().map(|v| self.check_expr(v));
 
                     // Check if the local is not already defined
@@ -417,7 +414,7 @@ impl<'cx> Typecheck<'cx> {
         })
     }
 
-    pub fn check(ast: Ast) -> ReturnMany<'cx, TypedAst> {
+    pub fn check(ast: Ast) -> ReturnMany<'tc, TypedAst> {
         let mut typeck = Typecheck::new();
         let mut nodes = Vec::new();
 

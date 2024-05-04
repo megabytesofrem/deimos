@@ -13,8 +13,8 @@ mod stmt;
 mod tidbits;
 
 #[derive(Clone)]
-pub struct Parser<'cx> {
-    tokens: LexerIter<'cx>,
+pub struct Parser<'p> {
+    tokens: LexerIter<'p>,
     errors: Vec<SyntaxError>,
 
     line: usize,
@@ -22,11 +22,11 @@ pub struct Parser<'cx> {
 }
 
 /// Result type for parsing
-pub(crate) type Return<'cx, T> = anyhow::Result<T, SyntaxError>;
-pub(crate) type ReturnBundle<'cx, T> = anyhow::Result<T, Vec<SyntaxError>>;
+pub(crate) type Return<'p, T> = anyhow::Result<T, SyntaxError>;
+pub(crate) type ReturnBundle<'p, T> = anyhow::Result<T, Vec<SyntaxError>>;
 
-impl<'cx> Parser<'cx> {
-    pub fn new(tokens: LexerIter<'cx>) -> Self {
+impl<'p> Parser<'p> {
+    pub fn new(tokens: LexerIter<'p>) -> Self {
         Parser {
             tokens,
             errors: Vec::new(),
@@ -40,19 +40,19 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Peek at the next token
-    pub(crate) fn peek(&mut self) -> Option<Token<'cx>> {
+    pub(crate) fn peek(&mut self) -> Option<Token<'p>> {
         self.tokens.peek().cloned()
     }
 
     /// Advance the parser by one token
-    pub(crate) fn advance(&mut self) -> Option<Token<'cx>> {
+    pub(crate) fn advance(&mut self) -> Option<Token<'p>> {
         self.col += 1;
         let token = self.tokens.next();
         token
     }
 
     /// Check if the next token is of the expected kind without advancing
-    pub(crate) fn check(&mut self, kind: TokenKind) -> Return<Token<'cx>> {
+    pub(crate) fn check(&mut self, kind: TokenKind) -> Return<Token<'p>> {
         let token = self.peek().ok_or(SyntaxError::UnexpectedEof)?;
         if token.kind == kind {
             Ok(token)
@@ -69,7 +69,7 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Consume the next token and return it if it matches the expected kind
-    pub(crate) fn expect(&mut self, kind: TokenKind) -> Return<Token<'cx>> {
+    pub(crate) fn expect(&mut self, kind: TokenKind) -> Return<Token<'p>> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         if token.kind == kind {
             Ok(token)
@@ -85,7 +85,7 @@ impl<'cx> Parser<'cx> {
         }
     }
 
-    pub(crate) fn expect_one_of(&mut self, kinds: Vec<TokenKind>) -> Return<Token<'cx>> {
+    pub(crate) fn expect_one_of(&mut self, kinds: Vec<TokenKind>) -> Return<Token<'p>> {
         let token = self.advance().ok_or(SyntaxError::UnexpectedEof)?;
         if kinds.contains(&token.kind) {
             Ok(token)
@@ -102,11 +102,11 @@ impl<'cx> Parser<'cx> {
     }
 
     /// Remap the error from `expect` to a custom error passed in
-    pub(crate) fn expect_error(&mut self, kind: TokenKind, err: SyntaxError) -> Return<Token<'cx>> {
+    pub(crate) fn expect_error(&mut self, kind: TokenKind, err: SyntaxError) -> Return<Token<'p>> {
         self.expect(kind).map_err(|_| err)
     }
 
-    pub fn parse(src: &'cx str) -> ReturnBundle<'cx, Ast> {
+    pub fn parse(src: &'p str) -> ReturnBundle<'p, Ast> {
         let mut parser = Parser::new(crate::syntax::lexer::lex_tokens(src));
         let mut nodes: Vec<Spanned<ToplevelStmt>> = Vec::new();
 

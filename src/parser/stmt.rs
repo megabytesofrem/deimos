@@ -10,7 +10,7 @@ use crate::utils::{spanned, Spanned};
 
 use super::Parser;
 
-impl<'cx> Parser<'cx> {
+impl<'p> Parser<'p> {
     pub(crate) fn parse_block(&mut self) -> parser::Return<Block> {
         let mut stmts = Vec::new();
 
@@ -255,6 +255,7 @@ impl<'cx> Parser<'cx> {
                 TokenKind::KwEnum => self.parse_enum_declare(),
                 TokenKind::KwFunction => self.parse_function_declare(),
                 TokenKind::KwExtern => self.parse_extern_declare(),
+                TokenKind::KwModule => self.parse_module_declare(),
 
                 // Unexpected token
                 _ => Err(SyntaxError::UnexpectedToken {

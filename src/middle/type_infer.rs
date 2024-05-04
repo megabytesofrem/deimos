@@ -9,7 +9,7 @@ use crate::utils::Spanned;
 
 use super::typecheck::{self, TypeError};
 
-impl<'cx> Typecheck<'cx> {
+impl<'tc> Typecheck<'tc> {
     // Inference functions
 
     pub(crate) fn infer_literal(&mut self, lit: &Literal) -> typecheck::Return<Ty> {
@@ -74,9 +74,8 @@ impl<'cx> Typecheck<'cx> {
         args: &Vec<Spanned<Expr>>,
     ) -> typecheck::Return<Ty> {
         let callee =
-            self.get_context()
+            self.get_typing_context()
                 .get(&name)
-                .cloned()
                 .ok_or_else(|| TypeError::UndefinedFunction {
                     name: name.clone(),
                     location: SourceLoc::default(),
@@ -117,7 +116,7 @@ impl<'cx> Typecheck<'cx> {
                 bubble_err!(
                     self,
                     TypeError::TypeMismatch {
-                        expected: Ty::Function(Box::new(Ty::Unknown), Vec::new()),
+                        expected: Ty::Function(Box::new(Ty::Unchecked), Vec::new()),
                         found: callee.clone(),
                         location: SourceLoc::default(),
                     }
@@ -128,7 +127,7 @@ impl<'cx> Typecheck<'cx> {
 
     pub(crate) fn infer_array(&mut self, elems: &[Spanned<Expr>]) -> typecheck::Return<Ty> {
         if elems.is_empty() {
-            return Ok(Ty::Array(Box::new(Ty::Unknown)));
+            return Ok(Ty::Array(Box::new(Ty::Unchecked)));
         }
 
         // Infer the overall type of the array from the first element
@@ -186,7 +185,7 @@ impl<'cx> Typecheck<'cx> {
             #[rustfmt::skip]
         _ => {
             bubble_err!(self, TypeError::TypeMismatch {
-                expected: Ty::Array(Box::new(Ty::Unknown)),
+                expected: Ty::Array(Box::new(Ty::Unchecked)),
                 found: indexable_ty.clone(),
                 location: indexable.location.clone(),
             });

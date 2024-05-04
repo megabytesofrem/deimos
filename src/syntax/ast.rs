@@ -1,4 +1,4 @@
-use crate::utils::Spanned;
+use crate::{backend::module_info::ModuleInfo, utils::Spanned};
 
 use super::lexer::{BinOp, SourceLoc, UnOp};
 
@@ -21,9 +21,10 @@ pub enum Ty {
     Char,
     String,
     Void,
-    Unknown,
+    Unchecked,
 
     Function(Box<Ty>, Vec<Ty>),
+    Module(ModuleInfo),
 
     // Arrays decay into pointers ala C
     Pointer(Box<Ty>),
