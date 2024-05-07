@@ -15,23 +15,24 @@ impl<'p> Parser<'p> {
         let mut stmts = Vec::new();
 
         'parse_stmts: while let Some(token) = self.peek() {
-            if matches!(token.kind, TokenKind::KwEnd) {
+            if matches!(token.kind, TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd) {
                 break 'parse_stmts;
             }
 
             let stmt = self.parse_stmt()?;
-            stmts.push(stmt);
+
+            if stmt.target != Stmt::BlockTerminator {
+                // `end` and `else` are a special case since it is a block terminator
+                stmts.push(stmt.clone());
+            }
         }
 
-        self.expect(TokenKind::KwEnd)?;
+        self.expect_one_of(vec![TokenKind::KwElif, TokenKind::KwElse, TokenKind::KwEnd])?;
 
         Ok(stmts)
     }
 
     pub(crate) fn parse_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
-        // FIXME: Why is it not erroring on completely moronic tokens?
-        //println!("got: {:?}", self.peek());
-
         let result = match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwLet => self.parse_let_stmt(),
@@ -46,6 +47,12 @@ impl<'p> Parser<'p> {
                     self.advance();
                     self.parse_stmt()
                 }
+                TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd => {
+                    // `end` and `else` are a special case since it is a block terminator
+                    //self.advance();
+                    Ok(spanned(Stmt::BlockTerminator, token.location.clone()))
+                }
+
                 // Unexpected token
                 // Commented until I add support for comments
                 _ => Err(SyntaxError::UnexpectedToken {
@@ -140,16 +147,28 @@ impl<'p> Parser<'p> {
         let mut has_else_block = false;
 
         let mut then_block: Vec<Spanned<Stmt>> = Vec::new();
+        let mut elif_blocks: Vec<(Spanned<Expr>, Block)> = Vec::new();
         let mut else_block: Vec<Spanned<Stmt>> = Vec::new();
 
         while let Some(_) = self.peek() {
             // Parse as many statements as we can until we reach either end or else
             let stmt = self.parse_stmt()?;
-            then_block.push(stmt);
+
+            if stmt.target != Stmt::BlockTerminator {
+                // `end` and `else` are a special case since it is a block terminator
+                then_block.push(stmt);
+            }
 
             if let Some(token) = self.peek() {
                 match token.kind {
-                    TokenKind::KwEnd => break,
+                    TokenKind::KwEnd => {
+                        self.advance();
+                        break;
+                    }
+                    TokenKind::KwElif => {
+                        let (cond, block) = self.parse_elif_block()?;
+                        elif_blocks.push((cond, block));
+                    }
                     TokenKind::KwElse => {
                         has_else_block = true;
                         break;
@@ -159,37 +178,49 @@ impl<'p> Parser<'p> {
             }
         }
 
-        if !has_else_block {
-            // Expect an end if we don't have an else block
-            self.expect(TokenKind::KwEnd)?;
-        } else {
-            // Parse the else block
-            self.expect(TokenKind::KwElse)?;
-            while let Some(_) = self.peek() {
-                let stmt = self.parse_stmt()?;
-                else_block.push(stmt);
-
-                if let Some(token) = self.peek() {
-                    if token.kind == TokenKind::KwEnd {
-                        break;
-                    }
-                }
-            }
-            self.expect(TokenKind::KwEnd)?;
+        if has_else_block {
+            else_block = self.parse_else_block()?;
         }
 
         Ok(spanned(
             Stmt::If {
                 cond: condition,
                 then_block,
-                else_block: if has_else_block {
-                    Some(else_block)
-                } else {
-                    None
-                },
+                elif_blocks,
+                else_block: if has_else_block { Some(else_block) } else { None },
             },
             token.location,
         ))
+    }
+
+    fn parse_elif_block(&mut self) -> parser::Return<(Spanned<Expr>, Block)> {
+        self.expect(TokenKind::KwElif)?;
+        let cond = self.parse_expr()?;
+        self.expect(TokenKind::KwThen)?;
+
+        // Parse a block, and then either an elif and a subsequent block, or an else block
+        let mut stmts: Vec<Spanned<Stmt>> = Vec::new();
+
+        while let Some(token) = self.peek() {
+            // Parse as many statements until we reach either elif or else
+            let stmt = self.parse_stmt()?;
+
+            if matches!(token.kind, TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd) {
+                break;
+            }
+
+            if stmt.target != Stmt::BlockTerminator {
+                // `end` and `else` are a special case since it is a block terminator
+                stmts.push(stmt);
+            }
+        }
+
+        Ok((cond, stmts))
+    }
+
+    fn parse_else_block(&mut self) -> parser::Return<Block> {
+        self.expect(TokenKind::KwElse)?;
+        self.parse_block()
     }
 
     fn parse_for_loop(&mut self) -> parser::Return<Spanned<Stmt>> {

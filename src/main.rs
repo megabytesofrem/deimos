@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use clap::Parser as Clap;
-use deimos::backend::transpile::Transpiler;
+
 use deimos::middle::typecheck::Typecheck;
 use deimos::parser::Parser;
 
@@ -40,11 +40,11 @@ fn drive(src: &str) -> anyhow::Result<()> {
         anyhow::anyhow!("Type checking failed")
     })?;
 
-    println!("{:#?}", typed_ast);
+    //println!("{:#?}", typed_ast);
 
     // Compile the typed AST to C code
-    let compiler = Transpiler::compile(&typed_ast);
-    println!("{}", compiler);
+    //let compiler = Transpiler::compile(&typed_ast);
+    //println!("{}", compiler);
 
     Ok(())
 }

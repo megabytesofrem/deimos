@@ -60,35 +60,37 @@ impl ModuleInfo {
         let module_name = self.name.to_uppercase();
         let comment_string = format!("// Generated header for module: {}\n", self.name);
 
-        self.pp.emit_line(&comment_string);
-        self.pp.emit_line(&format!("#ifndef {}_H\n", module_name));
-        self.pp.emit_line(&format!("#define {}_H\n\n", module_name));
+        // self.pp.emit_line(&comment_string);
+        // self.pp.emit_line(&format!("#ifndef {}_H\n", module_name));
+        // self.pp.emit_line(&format!("#define {}_H\n\n", module_name));
+        //
+        // // Walk through the functions and generate prototypes
+        // for func in &self.functions {
+        //     let mut prototype = String::new();
+        //     prototype.push_str(&format!(
+        //         "{} {}(",
+        //         self.pp.to_typename(&func.return_type),
+        //         // Prefix the function name with the module name
+        //         self.prefix_module_name(&self.name, &func.name)
+        //     ));
+        //
+        //     for (i, (arg_name, arg_ty)) in func.args.iter().enumerate() {
+        //         prototype.push_str(&format!("{} {}", self.pp.to_typename(arg_ty), arg_name));
+        //
+        //         if i < func.args.len() - 1 {
+        //             prototype.push_str(", ");
+        //         }
+        //     }
+        //
+        //     prototype.push_str(");");
+        //     self.pp.emit_line(&prototype);
+        // }
+        //
+        // self.pp.emit_line("#endif");
+        //
+        // self.pp.lines.join("\n")
 
-        // Walk through the functions and generate prototypes
-        for func in &self.functions {
-            let mut prototype = String::new();
-            prototype.push_str(&format!(
-                "{} {}(",
-                self.pp.to_typename(&func.return_type),
-                // Prefix the function name with the module name
-                self.prefix_module_name(&self.name, &func.name)
-            ));
-
-            for (i, (arg_name, arg_ty)) in func.args.iter().enumerate() {
-                prototype.push_str(&format!("{} {}", self.pp.to_typename(arg_ty), arg_name));
-
-                if i < func.args.len() - 1 {
-                    prototype.push_str(", ");
-                }
-            }
-
-            prototype.push_str(");");
-            self.pp.emit_line(&prototype);
-        }
-
-        self.pp.emit_line("#endif");
-
-        self.pp.lines.join("\n")
+        todo!()
     }
 }
 

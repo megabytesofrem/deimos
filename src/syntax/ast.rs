@@ -113,6 +113,7 @@ pub enum Expr {
 pub enum Stmt {
     Expr(Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
+    BlockTerminator,
 
     Let {
         name: String,
@@ -126,6 +127,7 @@ pub enum Stmt {
     If {
         cond: Spanned<Expr>,
         then_block: Block,
+        elif_blocks: Vec<(Spanned<Expr>, Block)>,
         else_block: Option<Block>,
     },
     For {

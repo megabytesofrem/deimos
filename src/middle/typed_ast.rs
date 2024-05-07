@@ -13,12 +13,11 @@ pub enum TExpr {
     BinOp(Box<Spanned<TExpr>>, BinOp, Box<Spanned<TExpr>>),
     UnOp(UnOp, Box<Spanned<TExpr>>),
 
-    Array {
-        elems: Vec<Spanned<TExpr>>,
-    },
-    Tuple {
-        elems: Vec<Spanned<TExpr>>,
-    },
+    Array(Vec<Spanned<TExpr>>),
+    Tuple(Vec<Spanned<TExpr>>),
+
+    Cast(Box<Spanned<TExpr>>, Ty),
+
     StructCons {
         fields: Vec<(String, Spanned<TExpr>)>,
     },
@@ -36,6 +35,7 @@ pub enum TExpr {
 pub enum TStmt {
     Expr(TExpr),
     Return(Option<Spanned<TExpr>>),
+    BlockTerminator,
 
     Let {
         name: String,

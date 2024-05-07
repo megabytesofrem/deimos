@@ -1,6 +1,6 @@
 //! Lexical analysis pass using `logos` crate
 use core::fmt;
-use std::{iter::Peekable, ops::Range};
+use std::iter::Peekable;
 
 use logos::{Logos, SpannedIter};
 
@@ -91,6 +91,8 @@ pub enum TokenKind {
     KwIf,
     #[token("then")]
     KwThen,
+    #[token("elif")]
+    KwElif,
     #[token("else")]
     KwElse,
     #[token("for")]

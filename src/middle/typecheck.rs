@@ -2,8 +2,8 @@
 
 use thiserror::Error;
 
-use crate::syntax::ast::Numeric;
 use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
+use crate::syntax::ast::Numeric;
 use crate::syntax::lexer::SourceLoc;
 use crate::utils::Spanned;
 
@@ -121,7 +121,11 @@ impl<'tc> Typecheck<'tc> {
                         array.push(self.check_expr(&elem)?);
                     }
 
-                    return Ok(TExpr::Array { elems: array });
+                    return Ok(TExpr::Array(array));
+                }
+                Expr::Cast(expr, ty) => {
+                    let expr = self.check_expr(&expr)?;
+                    return Ok(TExpr::Cast(Box::new(expr), ty.clone()));
                 }
                 Expr::ArrayIndex { array, index } => {
                     let array = self.check_expr(&array)?;
@@ -162,6 +166,7 @@ impl<'tc> Typecheck<'tc> {
 
                     Ok(TStmt::Return(None))
                 }
+                Stmt::BlockTerminator => Ok(TStmt::BlockTerminator),
                 Stmt::Let { name, ty, value } => {
                     let ty = ty.clone().unwrap_or(Ty::Unchecked);
                     let value_ = value.as_ref().map(|v| self.check_expr(v));
@@ -213,6 +218,7 @@ impl<'tc> Typecheck<'tc> {
                 Stmt::If {
                     cond,
                     then_block,
+                    elif_blocks: _,
                     else_block,
                 } => {
                     let cond = self.check_expr(&cond)?;
@@ -223,7 +229,7 @@ impl<'tc> Typecheck<'tc> {
                         .transpose()?;
 
                     Ok(TStmt::If {
-                        cond: cond,
+                        cond,
                         then_block,
                         else_block,
                     })
@@ -385,24 +391,23 @@ impl<'tc> Typecheck<'tc> {
                 let stmt = self.check_stmt(&stmt)?;
                 Ok(TToplevelStmt::Stmt(stmt))
             }
-            _ => unimplemented!(),
         })
     }
 
     pub fn check(ast: Ast) -> ReturnMany<'tc, TypedAst> {
-        let mut typeck = Typecheck::new();
+        let mut typecheck = Typecheck::new();
         let mut nodes = Vec::new();
 
         for node in ast.nodes {
-            let node = typeck.check_toplevel_stmt(&node);
+            let node = typecheck.check_toplevel_stmt(&node);
             match node {
                 Ok(node) => nodes.push(node),
-                Err(err) => typeck.errors.push(err),
+                Err(err) => typecheck.errors.push(err),
             }
         }
 
-        if !typeck.errors.is_empty() {
-            return Err(typeck.errors);
+        if !typecheck.errors.is_empty() {
+            return Err(typecheck.errors);
         }
 
         Ok(TypedAst { nodes })

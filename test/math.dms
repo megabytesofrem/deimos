@@ -10,6 +10,9 @@ function main()
     printc("Hello world")
     let squared:f32 = square(2.0)
 
+    let i:i32 = 0
+    let f:f32 = cast(i, f32)
+
     let a_num:i32 = 69
     if squared == 4.0 then
         printi(a_num)

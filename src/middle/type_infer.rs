@@ -177,6 +177,7 @@ impl<'tc> Typecheck<'tc> {
             Expr::BinOp(lhs, op, rhs) => self.infer_binop(lhs, op.clone(), rhs),
             Expr::Array(elems) => self.infer_array(elems),
             Expr::Tuple(elems) => self.infer_tuple(elems),
+            Expr::Cast(expr, ty) => Ok(ty.clone()),
             Expr::ArrayIndex { array, index } => self.infer_arraylike_index(array, index),
             Expr::Call { callee, args } => match &callee.target {
                 Expr::Name(name) => self.infer_function_call(name.clone(), args),
@@ -184,7 +185,7 @@ impl<'tc> Typecheck<'tc> {
                 // Cannot call functions on anything other than variables
                 _ => unimplemented!(),
             },
-            _ => todo!(),
+            e => todo!("{:?}", e),
         }
     }
 }

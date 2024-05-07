@@ -1,0 +1,11 @@
+let x:i32 = 0
+
+if 5 == 5 then
+    x = 1
+elif 5 == 6 then
+    x = 2
+elif 5 == 7 then
+    x = 3
+else
+    x = 4
+end
