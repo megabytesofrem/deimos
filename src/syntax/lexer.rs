@@ -69,6 +69,8 @@ pub enum TokenKind {
     StarEq,
     #[token("/=")]
     SlashEq,
+    #[token("::")]
+    ScopeResolution,
 
     // Keywords
     #[token("let")]
@@ -118,7 +120,7 @@ pub enum TokenKind {
 
     // Literals
     #[regex(r"[_a-zA-Z][_0-9a-zA-Z]*")]
-    Ident,
+    Name,
     #[regex(r"[-]?[0-9][0-9]*")]
     Integer,
     #[regex(r"[-]?[0-9]+\.[0-9]+")]

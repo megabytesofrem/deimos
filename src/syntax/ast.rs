@@ -1,4 +1,4 @@
-use crate::{backend::module_info::ModuleInfo, utils::Spanned};
+use crate::utils::Spanned;
 
 use super::lexer::{BinOp, SourceLoc, UnOp};
 
@@ -16,7 +16,7 @@ pub enum Numeric {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
-    Numeric(Numeric),
+    Number(Numeric),
     Bool,
     Char,
     String,
@@ -24,7 +24,7 @@ pub enum Ty {
     Unchecked,
 
     Function(Box<Ty>, Vec<Ty>),
-    Module(ModuleInfo),
+    //Module(ModuleInfo),
 
     // Arrays decay into pointers ala C
     Pointer(Box<Ty>),
@@ -51,11 +51,11 @@ pub enum Ty {
 
 impl Ty {
     pub fn is_primitive(&self) -> bool {
-        matches!(self, Ty::Numeric(_) | Ty::Bool | Ty::Char | Ty::String)
+        matches!(self, Ty::Number(_) | Ty::Bool | Ty::Char | Ty::String)
     }
 
     pub fn is_numeric(&self) -> bool {
-        matches!(self, Ty::Numeric(_))
+        matches!(self, Ty::Number(_))
     }
 
     pub fn is_pointer(&self) -> bool {
@@ -63,11 +63,21 @@ impl Ty {
     }
 
     pub fn is_index_type(&self) -> bool {
-        matches!(self, Ty::Numeric(_) | Ty::UserDefined(_))
+        matches!(self, Ty::Number(_) | Ty::UserDefined(_))
     }
 
     pub fn is_indexable_type(&self) -> bool {
         matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::UserDefined(_))
+    }
+
+    pub fn can_cast_into(&self, other: &Ty) -> bool {
+        match (self, other) {
+            (Ty::Number(_), Ty::Number(_)) => true,
+            (Ty::Pointer(_), Ty::Pointer(_)) => true,
+            (Ty::Array(_), Ty::Array(_)) => true,
+            (Ty::UserDefined(_), Ty::UserDefined(_)) => true,
+            _ => false,
+        }
     }
 }
 
@@ -84,7 +94,7 @@ pub enum Literal {
 pub enum Expr {
     // Primitive types
     Literal(Literal),
-    Name(String),
+    QualifiedName(String),
     Reference(Box<Spanned<Expr>>),
 
     // Operations

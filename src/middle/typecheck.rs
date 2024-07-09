@@ -2,8 +2,8 @@
 
 use thiserror::Error;
 
-use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
 use crate::syntax::ast::Numeric;
+use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
 use crate::syntax::lexer::SourceLoc;
 use crate::utils::Spanned;
 
@@ -39,6 +39,13 @@ pub enum TypeError {
     ReturnTypeMismatch {
         expected: Ty,
         found: Ty,
+        location: SourceLoc,
+    },
+
+    #[error("{location}: Invalid type coercion from '{from:?}' to '{into:?}'")]
+    InvalidCast {
+        from: Ty,
+        into: Ty,
         location: SourceLoc,
     },
 }
@@ -89,9 +96,10 @@ impl<'tc> Typecheck<'tc> {
         expr.clone().flat_map_spanned(|target| {
             match target {
                 Expr::Literal(lit) => {
+                    //println!("check_expr literal: {:?}", lit);
                     return Ok(TExpr::Literal(lit.clone(), ty.clone()));
                 }
-                Expr::Name(name) => {
+                Expr::QualifiedName(name) => {
                     let ty2 = self.check_variable(&name, expr.location.clone())?;
                     if ty != ty2 {
                         return Err(TypeError::TypeMismatch {
@@ -125,7 +133,11 @@ impl<'tc> Typecheck<'tc> {
                 }
                 Expr::Cast(expr, ty) => {
                     let expr = self.check_expr(&expr)?;
-                    return Ok(TExpr::Cast(Box::new(expr), ty.clone()));
+                    println!("TCast: {:?} -> {:?}", expr, ty);
+
+                    let t = Ok(TExpr::Cast(Box::new(expr), ty.clone()));
+                    println!("TCast: {:?}", t);
+                    return t;
                 }
                 Expr::ArrayIndex { array, index } => {
                     let array = self.check_expr(&array)?;
@@ -169,7 +181,17 @@ impl<'tc> Typecheck<'tc> {
                 Stmt::BlockTerminator => Ok(TStmt::BlockTerminator),
                 Stmt::Let { name, ty, value } => {
                     let ty = ty.clone().unwrap_or(Ty::Unchecked);
-                    let value_ = value.as_ref().map(|v| self.check_expr(v));
+
+                    // Perform type casting *before* we call check_expr
+                    let casted_value = value
+                        .as_ref()
+                        .map(|v| self.raw_cast_expr(v, &ty))
+                        .transpose()?;
+
+                    println!("Casted value: {:?}", casted_value);
+
+                    let value_ = casted_value.as_ref().map(|v| self.check_expr(v));
+                    println!("value_: {:?}", value_);
 
                     // Check if the local is not already defined
                     if self.ctx.get(&name).is_some() {
@@ -179,17 +201,20 @@ impl<'tc> Typecheck<'tc> {
                         });
                     }
 
-                    // Check the type being assigned actually makes sense
-                    if let Some(value) = &value {
-                        let value_ty = self.infer_expr(value)?;
-                        if ty != value_ty {
-                            return Err(TypeError::TypeMismatch {
-                                expected: ty.clone(),
-                                found: value_ty.clone(),
-                                location: value.location.clone(),
-                            });
-                        }
-                    }
+                    // FIXME: This block of code causes immense sadness to all who witness it
+                    // In other words, it causes our typechecker to reject valid type casts
+
+                    // // Check the type being assigned actually makes sense
+                    // if let Some(value) = &value {
+                    //     let value_ty = self.infer_expr(value)?;
+                    //     if ty != value_ty {
+                    //         return Err(TypeError::TypeMismatch {
+                    //             expected: ty.clone(),
+                    //             found: value_ty.clone(),
+                    //             location: value.location.clone(),
+                    //         });
+                    //     }
+                    // }
 
                     self.ctx.insert(name.clone(), ty.clone());
                     Ok(TStmt::Let {
@@ -317,7 +342,7 @@ impl<'tc> Typecheck<'tc> {
 
         // Insert the enum fields into the context
         for field in fields {
-            self.ctx.insert(field.clone(), Ty::Numeric(Numeric::I32))
+            self.ctx.insert(field.clone(), Ty::Number(Numeric::I32))
         }
 
         Ok(TToplevelStmt::EnumDecl {

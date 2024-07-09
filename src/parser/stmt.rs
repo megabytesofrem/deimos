@@ -1,7 +1,6 @@
 //! Parsing of statements and blocks.
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
-use crate::backend::module_info::ModuleInfo;
 use crate::parser;
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
@@ -15,7 +14,10 @@ impl<'p> Parser<'p> {
         let mut stmts = Vec::new();
 
         'parse_stmts: while let Some(token) = self.peek() {
-            if matches!(token.kind, TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd) {
+            if matches!(
+                token.kind,
+                TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd
+            ) {
                 break 'parse_stmts;
             }
 
@@ -36,7 +38,7 @@ impl<'p> Parser<'p> {
         let result = match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwLet => self.parse_let_stmt(),
-                TokenKind::Ident => self.parse_ident_or_assign(),
+                TokenKind::Name => self.parse_ident_or_assign(),
                 TokenKind::KwIf => self.parse_if_stmt(),
                 TokenKind::KwFor => self.parse_for_loop(),
                 TokenKind::KwWhile => self.parse_while_loop(),
@@ -59,7 +61,7 @@ impl<'p> Parser<'p> {
                     token: token.kind.clone(),
                     expected_any: vec![
                         TokenKind::KwLet,
-                        TokenKind::Ident,
+                        TokenKind::Name,
                         TokenKind::KwIf,
                         TokenKind::KwFor,
                         TokenKind::KwWhile,
@@ -81,7 +83,7 @@ impl<'p> Parser<'p> {
     fn parse_let_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
         // let ident:type = expr
         let t = self.expect(TokenKind::KwLet)?;
-        let ident = self.expect(TokenKind::Ident)?;
+        let ident = self.expect(TokenKind::Name)?;
         self.expect(TokenKind::Colon)?;
         let ty = self.parse_type()?;
 
@@ -100,7 +102,7 @@ impl<'p> Parser<'p> {
 
     fn parse_ident_or_assign(&mut self) -> parser::Return<Spanned<Stmt>> {
         // ident = expr or ident(expr, expr, ...)
-        let ident = self.expect(TokenKind::Ident)?;
+        let ident = self.expect(TokenKind::Name)?;
         match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::Equal => self.parse_assign_stmt(ident),
@@ -125,7 +127,7 @@ impl<'p> Parser<'p> {
         Ok(spanned(
             Stmt::Assign {
                 target: spanned(
-                    Expr::Name(ident.literal.to_string()),
+                    Expr::QualifiedName(ident.literal.to_string()),
                     ident.location.clone(),
                 ),
                 value: expr,
@@ -187,7 +189,11 @@ impl<'p> Parser<'p> {
                 cond: condition,
                 then_block,
                 elif_blocks,
-                else_block: if has_else_block { Some(else_block) } else { None },
+                else_block: if has_else_block {
+                    Some(else_block)
+                } else {
+                    None
+                },
             },
             token.location,
         ))
@@ -205,7 +211,10 @@ impl<'p> Parser<'p> {
             // Parse as many statements until we reach either elif or else
             let stmt = self.parse_stmt()?;
 
-            if matches!(token.kind, TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd) {
+            if matches!(
+                token.kind,
+                TokenKind::KwElif | TokenKind::KwElse | TokenKind::KwEnd
+            ) {
                 break;
             }
 
@@ -229,7 +238,7 @@ impl<'p> Parser<'p> {
         // end
 
         let token = self.expect(TokenKind::KwFor)?;
-        let ident = self.expect(TokenKind::Ident)?;
+        let ident = self.expect(TokenKind::Name)?;
         self.expect(TokenKind::Equal)?;
         let start = self.parse_expr()?;
         self.expect(TokenKind::Comma)?;
@@ -315,9 +324,9 @@ impl<'p> Parser<'p> {
         //    functions
         // end
         let token = self.expect(TokenKind::KwModule)?;
-        let name = self.expect(TokenKind::Ident)?;
+        let name = self.expect(TokenKind::Name)?;
 
-        let mut module_info = ModuleInfo::new(name.literal.to_string());
+        //let mut module_info = ModuleInfo::new(name.literal.to_string());
 
         todo!("Implement module parsing")
     }
@@ -332,7 +341,7 @@ impl<'p> Parser<'p> {
         let mut return_type: Ty = Ty::Void;
         self.expect(TokenKind::KwExtern)?;
         self.expect(TokenKind::KwFunction)?;
-        let name = self.expect(TokenKind::Ident)?;
+        let name = self.expect(TokenKind::Name)?;
 
         self.expect(TokenKind::LParen)?;
         let params = self.parse_annotated_params()?;
@@ -358,7 +367,7 @@ impl<'p> Parser<'p> {
         //  field*
         // end
         let token = self.expect(TokenKind::KwStruct)?;
-        let name = self.expect(TokenKind::Ident)?;
+        let name = self.expect(TokenKind::Name)?;
 
         let mut fields = Vec::new();
         while let Some(token) = self.peek() {
@@ -367,7 +376,7 @@ impl<'p> Parser<'p> {
                 break;
             }
 
-            let ident = self.expect(TokenKind::Ident)?;
+            let ident = self.expect(TokenKind::Name)?;
             self.expect(TokenKind::Colon)?;
             let ty = self.parse_type()?;
             fields.push((ident.literal.to_string(), ty));
@@ -390,7 +399,7 @@ impl<'p> Parser<'p> {
         //   field*
         // end
         let token = self.expect(TokenKind::KwEnum)?;
-        let name = self.expect(TokenKind::Ident)?;
+        let name = self.expect(TokenKind::Name)?;
 
         let mut fields = Vec::new();
         while let Some(token) = self.peek() {
@@ -399,7 +408,7 @@ impl<'p> Parser<'p> {
                 break;
             }
 
-            let ident = self.expect(TokenKind::Ident)?;
+            let ident = self.expect(TokenKind::Name)?;
             fields.push(ident.literal.to_string());
 
             if let Some(token) = self.peek() {
@@ -422,7 +431,7 @@ impl<'p> Parser<'p> {
 
         let mut return_type = Ty::Void;
         self.expect(TokenKind::KwFunction)?;
-        let name = self.expect(TokenKind::Ident)?;
+        let name = self.expect(TokenKind::Name)?;
 
         self.expect(TokenKind::LParen)?;
         let params = self.parse_annotated_params()?;

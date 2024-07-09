@@ -2,6 +2,7 @@ use std::error::Error;
 
 use clap::Parser as Clap;
 
+// use deimos::backend::transpile::Transpiler;
 use deimos::middle::typecheck::Typecheck;
 use deimos::parser::Parser;
 
@@ -39,6 +40,8 @@ fn drive(src: &str) -> anyhow::Result<()> {
         print_errors(e);
         anyhow::anyhow!("Type checking failed")
     })?;
+
+    println!("{:#?}", typed_ast);
 
     //println!("{:#?}", typed_ast);
 

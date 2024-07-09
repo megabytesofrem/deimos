@@ -17,13 +17,13 @@ impl<'p> Parser<'p> {
             // a.k.a optionals implemented at a compiler level.
             //
             // It will be the preferred way to represent exceptions in the language.
-            TokenKind::Ident => {
+            TokenKind::Name => {
                 let ident_or_type = token.literal.to_string();
                 match ident_or_type.as_str() {
-                    "i32" => Ok(Ty::Numeric(Numeric::I32)),
-                    "i64" => Ok(Ty::Numeric(Numeric::I64)),
-                    "f32" => Ok(Ty::Numeric(Numeric::F32)),
-                    "f64" => Ok(Ty::Numeric(Numeric::F64)),
+                    "i32" => Ok(Ty::Number(Numeric::I32)),
+                    "i64" => Ok(Ty::Number(Numeric::I64)),
+                    "f32" => Ok(Ty::Number(Numeric::F32)),
+                    "f64" => Ok(Ty::Number(Numeric::F64)),
                     "char" => Ok(Ty::Char),
                     "bool" => Ok(Ty::Bool),
                     "string" => Ok(Ty::String),
@@ -54,14 +54,14 @@ impl<'p> Parser<'p> {
             // Invalid type
             _ => Err(SyntaxError::UnexpectedToken {
                 token: token.kind.clone(),
-                expected_any: vec![TokenKind::Ident],
+                expected_any: vec![TokenKind::Name],
                 location: token.location.clone(),
             }),
         }
     }
 
     pub(crate) fn parse_annotated_param(&mut self) -> parser::Return<Param> {
-        let ident = self.expect(TokenKind::Ident)?;
+        let ident = self.expect(TokenKind::Name)?;
         self.expect(TokenKind::Colon)?;
         let ty = self.parse_type()?;
         Ok((ident.literal.to_string(), ty))
@@ -99,7 +99,7 @@ impl<'p> Parser<'p> {
             match self.peek() {
                 Some(token) if token.kind == TokenKind::RParen => break,
                 Some(_) => {
-                    let ident = self.expect(TokenKind::Ident)?;
+                    let ident = self.expect(TokenKind::Name)?;
                     params.push(ident.literal.to_string());
                     if let Some(token) = self.peek() {
                         if token.kind == TokenKind::RParen {

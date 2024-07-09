@@ -1,9 +1,13 @@
 //! Parsing of expressions
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
+use std::env::var;
+
+use logos::source;
+
 use super::Parser;
 use crate::parser;
-use crate::syntax::ast::{Expr, Literal, Ty};
+use crate::syntax::ast::{Expr, Literal, Numeric, Ty};
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{BinOp, Token, TokenKind, UnOp};
 use crate::utils::{spanned, Spanned};
@@ -120,6 +124,25 @@ impl<'p> Parser<'p> {
         self.parse_expr_prec(0)
     }
 
+    pub fn parse_qualified_name(&mut self) -> parser::Return<Vec<String>> {
+        // Parse an optional qualified name and return a Vec<String> consisting
+        // of it's parts.
+
+        let mut qualified_name = Vec::new();
+
+        while let Some(token) = self.advance() {
+            match token.kind {
+                TokenKind::Name => {
+                    qualified_name.push(token.literal.to_string());
+                }
+                TokenKind::ScopeResolution => continue,
+                _ => break,
+            }
+        }
+
+        Ok(qualified_name)
+    }
+
     fn parse_literal(&mut self, token: &Token) -> parser::Return<Literal> {
         let location = self.peek().map(|t| t.location).unwrap_or_default();
 
@@ -164,7 +187,7 @@ impl<'p> Parser<'p> {
 
         Ok(spanned(
             Expr::Call {
-                callee: Box::new(spanned(Expr::Name(name), location.clone())),
+                callee: Box::new(spanned(Expr::QualifiedName(name), location.clone())),
                 args,
             },
             location,
@@ -193,7 +216,7 @@ impl<'p> Parser<'p> {
             TokenKind::LParen,
             TokenKind::LSquare,
             TokenKind::LCurly,
-            TokenKind::Ident,
+            TokenKind::Name,
         ];
 
         let location = self.peek().map(|t| t.location).unwrap_or_default();
@@ -237,7 +260,7 @@ impl<'p> Parser<'p> {
                 let literal = self.parse_literal(&token)?;
                 Ok(spanned(Expr::Literal(literal), location))
             }
-            TokenKind::Ident => {
+            TokenKind::Name => {
                 let location = self.peek().map(|t| t.location).unwrap_or_default();
                 //let expr = self.parse_expr()?;
                 let name = token.literal.to_string();
@@ -250,7 +273,10 @@ impl<'p> Parser<'p> {
                         let expr = self.parse_expr()?;
                         return self.parse_array_index(&expr.target);
                     }
-                    _ => Ok(spanned(Expr::Name(name), location)),
+                    _ => {
+                        let qualified_name = self.parse_qualified_name()?.join("::");
+                        Ok(spanned(Expr::QualifiedName(name), location))
+                    }
                 }
             }
 
@@ -330,7 +356,7 @@ impl<'p> Parser<'p> {
     }
 
     fn parse_field(&mut self) -> parser::Return<(String, Spanned<Expr>)> {
-        let name = self.expect(TokenKind::Ident)?.literal.to_string();
+        let name = self.expect(TokenKind::Name)?.literal.to_string();
         self.expect(TokenKind::Colon)?;
         let expr = self.parse_expr()?;
 
@@ -372,5 +398,30 @@ impl<'p> Parser<'p> {
             },
             location,
         ))
+    }
+}
+
+#[cfg(test)]
+mod expr_parse_tests {
+    use parser::Parser;
+    use crate::*;
+
+    #[test]
+    fn parse_qualified_names() {
+        let qual_names = vec![
+            "foo".to_string(),
+            "foo::bar".to_string(),
+            "foo::bar::baz".to_string(),
+        ];
+
+        for name in qual_names {
+            let mut parser = Parser::new(syntax::lexer::lex_tokens(&name));
+            let result = parser.parse_qualified_name().unwrap();
+            assert_eq!(result.join("::"), name);
+
+            println!("Parsed qualified name: {}", result.join("::"));
+        }
+
+
     }
 }

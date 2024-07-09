@@ -4,18 +4,155 @@
 use crate::middle::typecheck::Typecheck;
 use crate::syntax::ast::{Expr, Literal, Numeric, Ty};
 use crate::syntax::lexer::{BinOp, SourceLoc};
-use crate::utils::Spanned;
+use crate::utils::{spanned, Spanned};
 
 use super::typecheck::{self, TypeError};
+use super::typed_ast::TExpr;
 
 impl<'tc> Typecheck<'tc> {
-    // Inference functions
+    // Inference engine functions
+
+    pub fn cast_expr(
+        &mut self,
+        expr: &Spanned<Expr>,
+        target_ty: &Ty,
+        just_wrap_in_cast: bool,
+    ) -> typecheck::Return<Spanned<Expr>> {
+        // just_wrap_in_cast specifies if we should cast down to the type on the AST level,
+        // or just wrap the conversion in a cast node.
+
+        match &expr.target {
+            Expr::Literal(lit) => {
+                let src_ty = self.infer_literal(&lit)?;
+
+                // Check if we can cast from a source type to a target type
+                assert!(src_ty.can_cast_into(target_ty));
+
+                if src_ty == *target_ty {
+                    return Ok(expr.clone());
+                }
+
+                let casted_expr = if just_wrap_in_cast {
+                    Expr::Cast(Box::new(expr.clone()), target_ty.clone())
+                } else {
+                    let literal = self.cast_literal(lit, &src_ty, target_ty);
+                    Expr::Literal(literal)
+                };
+
+                Ok(spanned(casted_expr, expr.location.clone()))
+            }
+            Expr::QualifiedName(name) => {
+                let src_ty = self.check_variable(name, expr.location.clone())?;
+
+                // Check if we can cast from a source type to a target type
+                assert!(src_ty.can_cast_into(target_ty));
+
+                if src_ty == *target_ty {
+                    return Ok(expr.clone());
+                }
+
+                let casted_expr = if just_wrap_in_cast {
+                    Expr::Cast(Box::new(expr.clone()), target_ty.clone())
+                } else {
+                    Expr::QualifiedName(name.clone())
+                };
+
+                Ok(spanned(casted_expr, expr.location.clone()))
+            }
+            Expr::BinOp(lhs, op, rhs) => {
+                let lhs = self.cast_expr(lhs, target_ty, just_wrap_in_cast)?;
+                let rhs = self.cast_expr(rhs, target_ty, just_wrap_in_cast)?;
+
+                Ok(spanned(
+                    Expr::BinOp(Box::new(lhs), op.clone(), Box::new(rhs)),
+                    expr.location.clone(),
+                ))
+            }
+            Expr::UnOp(op, exp) => {
+                let expr = self.cast_expr(exp, target_ty, just_wrap_in_cast)?;
+
+                Ok(spanned(
+                    Expr::UnOp(op.clone(), Box::new(expr.clone())),
+                    expr.location.clone(),
+                ))
+            }
+            Expr::Array(elems) => {
+                let mut casted_elems = Vec::new();
+                for elem in elems {
+                    let casted_elem = self.cast_expr(elem, target_ty, just_wrap_in_cast)?;
+                    casted_elems.push(casted_elem);
+                }
+
+                Ok(spanned(Expr::Array(casted_elems), expr.location.clone()))
+            }
+            Expr::Tuple(elems) => {
+                let mut casted_elems = Vec::new();
+                for elem in elems {
+                    let casted_elem = self.cast_expr(elem, target_ty, just_wrap_in_cast)?;
+                    casted_elems.push(casted_elem);
+                }
+
+                Ok(spanned(Expr::Tuple(casted_elems), expr.location.clone()))
+            }
+            Expr::StructCons { fields: _ } => {
+                // We cant directly cast a struct to another struct, we can only wrap it in a cast node
+                if !just_wrap_in_cast {
+                    return Err(TypeError::InvalidCast {
+                        from: Ty::Unchecked,
+                        into: target_ty.clone(),
+                        location: expr.location.clone(),
+                    });
+                } else {
+                    Ok(spanned(
+                        Expr::Cast(Box::new(expr.clone()), target_ty.clone()),
+                        expr.location.clone(),
+                    ))
+                }
+            }
+
+            _ => Err(TypeError::InvalidCast {
+                from: Ty::Unchecked,
+                into: target_ty.clone(),
+                location: expr.location.clone(),
+            }),
+        }
+    }
+
+    fn cast_literal(&self, lit: &Literal, src_ty: &Ty, target_ty: &Ty) -> Literal {
+        match (src_ty, target_ty) {
+            (Ty::Number(Numeric::F32), Ty::Number(Numeric::F64)) => match lit {
+                Literal::Float32(f) => Literal::Float64(*f as f64),
+                _ => unreachable!(),
+            },
+            (Ty::Number(Numeric::F64), Ty::Number(Numeric::F32)) => match lit {
+                Literal::Float64(f) => Literal::Float32(*f as f32),
+                _ => unreachable!(),
+            },
+            (Ty::Number(Numeric::F32), Ty::Number(Numeric::I32)) => match lit {
+                Literal::Float32(f) => Literal::Int(*f as i32),
+                _ => unreachable!(),
+            },
+            (Ty::Number(Numeric::F64), Ty::Number(Numeric::I32)) => match lit {
+                Literal::Float64(f) => Literal::Int(*f as i32),
+                _ => unreachable!(),
+            },
+            _ => lit.clone(),
+        }
+    }
+
+    pub fn raw_cast_expr(
+        &mut self,
+        expr: &Spanned<Expr>,
+        target_ty: &Ty,
+    ) -> typecheck::Return<Spanned<Expr>> {
+        self.cast_expr(expr, target_ty, false)
+    }
 
     pub(crate) fn infer_literal(&mut self, lit: &Literal) -> typecheck::Return<Ty> {
         match lit {
-            Literal::Int(_) => Ok(Ty::Numeric(Numeric::I32)),
-            Literal::Float32(_) => Ok(Ty::Numeric(Numeric::F32)),
-            Literal::Float64(_) => Ok(Ty::Numeric(Numeric::F64)),
+            Literal::Int(_) => Ok(Ty::Number(Numeric::I32)),
+            Literal::Float32(_) => Ok(Ty::Number(Numeric::F32)),
+            Literal::Float64(_) => Ok(Ty::Number(Numeric::F64)),
             Literal::Bool(_) => Ok(Ty::Bool),
             Literal::String(_) => Ok(Ty::String),
         }
@@ -151,7 +288,7 @@ impl<'tc> Typecheck<'tc> {
         // Check if `index_ty` is a valid index type or not
         if !index_ty.is_index_type() {
             return Err(TypeError::TypeMismatch {
-                expected: Ty::Numeric(Numeric::I32),
+                expected: Ty::Number(Numeric::I32),
                 found: index_ty.clone(),
                 location: index.location.clone(),
             });
@@ -173,14 +310,31 @@ impl<'tc> Typecheck<'tc> {
     pub(crate) fn infer_expr(&mut self, expr: &Spanned<Expr>) -> typecheck::Return<Ty> {
         match &expr.target {
             Expr::Literal(lit) => self.check_literal(lit),
-            Expr::Name(name) => self.check_variable(name, expr.location.clone()),
+            Expr::QualifiedName(name) => self.check_variable(name, expr.location.clone()),
             Expr::BinOp(lhs, op, rhs) => self.infer_binop(lhs, op.clone(), rhs),
             Expr::Array(elems) => self.infer_array(elems),
             Expr::Tuple(elems) => self.infer_tuple(elems),
-            Expr::Cast(expr, ty) => Ok(ty.clone()),
+            Expr::Cast(expr, ty) => {
+                println!("Cast: {:?} -> {:?}", expr, ty);
+
+                let expr_ty = self.infer_expr(expr)?;
+                if expr_ty.can_cast_into(ty) {
+                    println!(
+                        "Cast is valid, inferred type: {:?} and target type: {:?}",
+                        expr_ty, ty
+                    );
+                    Ok(ty.clone())
+                } else {
+                    Err(TypeError::InvalidCast {
+                        from: expr_ty,
+                        into: ty.clone(),
+                        location: expr.location.clone(),
+                    })
+                }
+            }
             Expr::ArrayIndex { array, index } => self.infer_arraylike_index(array, index),
             Expr::Call { callee, args } => match &callee.target {
-                Expr::Name(name) => self.infer_function_call(name.clone(), args),
+                Expr::QualifiedName(name) => self.infer_function_call(name.clone(), args),
 
                 // Cannot call functions on anything other than variables
                 _ => unimplemented!(),

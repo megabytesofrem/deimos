@@ -1,20 +1,3 @@
-extern function powc(x:f32,y:f32): f32
-extern function printc(string:string): void
-extern function printi(number:i32): void
-
-function square(x:f32): f32
-    return x * x
-end
-
-function main()
-    printc("Hello world")
-    let squared:f32 = square(2.0)
-
-    let i:i32 = 0
-    let f:f32 = cast(i, f32)
-
-    let a_num:i32 = 69
-    if squared == 4.0 then
-        printi(a_num)
-    end
-end
+let a: f32 = 69.0
+let b: f32 = a
+let c: f32 = 69.0
