@@ -1,3 +1,2 @@
 let a: f32 = 69.0
 let b: f32 = a
-let c: f32 = 69.0

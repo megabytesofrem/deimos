@@ -23,7 +23,7 @@ pub struct Parser<'p> {
 
 /// Result type for parsing
 pub(crate) type Return<'p, T> = anyhow::Result<T, SyntaxError>;
-pub(crate) type ReturnBundle<'p, T> = anyhow::Result<T, Vec<SyntaxError>>;
+pub(crate) type ReturnErrors<'p, T> = anyhow::Result<T, Vec<SyntaxError>>;
 
 impl<'p> Parser<'p> {
     pub fn new(tokens: LexerIter<'p>) -> Self {
@@ -115,7 +115,7 @@ impl<'p> Parser<'p> {
         self.expect(kind).map_err(|_| err)
     }
 
-    pub fn parse(src: &'p str) -> ReturnBundle<'p, Ast> {
+    pub fn parse(src: &'p str) -> ReturnErrors<'p, Ast> {
         let mut parser = Parser::new(crate::syntax::lexer::lex_tokens(src));
         let mut nodes: Vec<Spanned<ToplevelStmt>> = Vec::new();
 

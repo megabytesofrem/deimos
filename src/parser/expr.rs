@@ -130,7 +130,7 @@ impl<'p> Parser<'p> {
 
         let mut qualified_name = Vec::new();
 
-        while let Some(token) = self.advance() {
+        while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Name => {
                     qualified_name.push(token.literal.to_string());
@@ -403,8 +403,8 @@ impl<'p> Parser<'p> {
 
 #[cfg(test)]
 mod expr_parse_tests {
-    use parser::Parser;
     use crate::*;
+    use parser::Parser;
 
     #[test]
     fn parse_qualified_names() {
@@ -421,7 +421,5 @@ mod expr_parse_tests {
 
             println!("Parsed qualified name: {}", result.join("::"));
         }
-
-
     }
 }

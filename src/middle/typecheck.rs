@@ -42,7 +42,7 @@ pub enum TypeError {
         location: SourceLoc,
     },
 
-    #[error("{location}: Invalid type coercion from '{from:?}' to '{into:?}'")]
+    #[error("{location}: Invalid type cast between '{from:?}' and '{into:?}'")]
     InvalidCast {
         from: Ty,
         into: Ty,
@@ -52,7 +52,7 @@ pub enum TypeError {
 
 // Holds the type that is returned from the type checker
 pub(crate) type Return<T> = anyhow::Result<T, TypeError>;
-pub(crate) type ReturnMany<'cx, T> = anyhow::Result<T, Vec<TypeError>>;
+pub(crate) type Returns<'cx, T> = anyhow::Result<T, Vec<TypeError>>;
 
 // Type checker pass
 #[derive(Debug, Clone)]
@@ -188,10 +188,7 @@ impl<'tc> Typecheck<'tc> {
                         .map(|v| self.raw_cast_expr(v, &ty))
                         .transpose()?;
 
-                    println!("Casted value: {:?}", casted_value);
-
                     let value_ = casted_value.as_ref().map(|v| self.check_expr(v));
-                    println!("value_: {:?}", value_);
 
                     // Check if the local is not already defined
                     if self.ctx.get(&name).is_some() {
@@ -200,21 +197,6 @@ impl<'tc> Typecheck<'tc> {
                             location: stmt.location.clone(),
                         });
                     }
-
-                    // FIXME: This block of code causes immense sadness to all who witness it
-                    // In other words, it causes our typechecker to reject valid type casts
-
-                    // // Check the type being assigned actually makes sense
-                    // if let Some(value) = &value {
-                    //     let value_ty = self.infer_expr(value)?;
-                    //     if ty != value_ty {
-                    //         return Err(TypeError::TypeMismatch {
-                    //             expected: ty.clone(),
-                    //             found: value_ty.clone(),
-                    //             location: value.location.clone(),
-                    //         });
-                    //     }
-                    // }
 
                     self.ctx.insert(name.clone(), ty.clone());
                     Ok(TStmt::Let {
@@ -419,7 +401,7 @@ impl<'tc> Typecheck<'tc> {
         })
     }
 
-    pub fn check(ast: Ast) -> ReturnMany<'tc, TypedAst> {
+    pub fn check(ast: Ast) -> Returns<'tc, TypedAst> {
         let mut typecheck = Typecheck::new();
         let mut nodes = Vec::new();
 
