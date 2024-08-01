@@ -7,7 +7,7 @@ use logos::source;
 
 use super::Parser;
 use crate::parser;
-use crate::syntax::ast::{Expr, Literal, Numeric, Ty};
+use crate::syntax::ast::{Expr, Literal};
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{BinOp, Token, TokenKind, UnOp};
 use crate::utils::{spanned, Spanned};
@@ -219,6 +219,9 @@ impl<'p> Parser<'p> {
             TokenKind::Name,
         ];
 
+        // FIXME: Should we not advance the token here?
+        // It would require more checks, but maybe that will be make it clearer?
+
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let token = self.advance().ok_or(SyntaxError::ExpectedExpr {
             location: location.clone(),
@@ -367,8 +370,6 @@ impl<'p> Parser<'p> {
         // {field1: value1, field2: value2}
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let mut fields = Vec::new();
-
-        self.expect(TokenKind::LCurly)?;
 
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::RCurly {

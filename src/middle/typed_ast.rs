@@ -1,6 +1,7 @@
 /// Typed AST representation
-use crate::syntax::ast::{Literal, Ty};
+use crate::syntax::ast::Literal;
 use crate::syntax::lexer::{BinOp, UnOp};
+use crate::syntax::types::Ty;
 use crate::utils::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]

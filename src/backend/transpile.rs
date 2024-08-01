@@ -1,4 +1,4 @@
-use crate::syntax::ast::{Numeric, Ty};
+use crate::syntax::types::{Numeric, Ty};
 
 #[derive(Debug, Clone)]
 pub(crate) struct PrettyPrinter {

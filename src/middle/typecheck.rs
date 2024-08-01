@@ -2,9 +2,9 @@
 
 use thiserror::Error;
 
-use crate::syntax::ast::Numeric;
-use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
+use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt};
 use crate::syntax::lexer::SourceLoc;
+use crate::syntax::types::{Numeric, Ty};
 use crate::utils::Spanned;
 
 use super::name_resolver::Resolver;
@@ -139,6 +139,14 @@ impl<'tc> Typecheck<'tc> {
                     println!("TCast: {:?}", t);
                     return t;
                 }
+                Expr::StructCons { fields } => {
+                    let mut fields_ = Vec::new();
+                    for (name, expr) in fields {
+                        fields_.push((name.clone(), self.check_expr(&expr)?));
+                    }
+
+                    return Ok(TExpr::StructCons { fields: fields_ });
+                }
                 Expr::ArrayIndex { array, index } => {
                     let array = self.check_expr(&array)?;
                     let index = self.check_expr(&index)?;
@@ -240,6 +248,36 @@ impl<'tc> Typecheck<'tc> {
                         then_block,
                         else_block,
                     })
+                }
+                Stmt::For {
+                    init,
+                    from,
+                    to,
+                    body,
+                } => {
+                    // Insert the temporary initializer variable into the context
+                    let ty = self.infer_expr(&from)?;
+                    self.ctx.insert(init.clone(), ty);
+
+                    let from = self.check_expr(&from)?;
+                    let to = self.check_expr(&to)?;
+                    let body = self.check_block(&body)?;
+
+                    // Remove the temporary variable from the context
+                    self.ctx.remove(&init);
+
+                    Ok(TStmt::For {
+                        init: init.clone(),
+                        from,
+                        to,
+                        body,
+                    })
+                }
+                Stmt::While { cond, block } => {
+                    let cond = self.check_expr(&cond)?;
+                    let block = self.check_block(&block)?;
+
+                    Ok(TStmt::While { cond, block })
                 }
                 _ => unimplemented!(),
             }

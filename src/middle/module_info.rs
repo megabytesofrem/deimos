@@ -1,6 +1,6 @@
 //! Module information builder, walks the type-annotated AST and collects module information
 use crate::{
-    syntax::ast::{Numeric, StructureKind, Ty},
+    syntax::types::{Numeric, StructureKind, Ty},
     utils::Spanned,
 };
 

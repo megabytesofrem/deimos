@@ -5,6 +5,7 @@ use crate::parser;
 use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::{Token, TokenKind};
+use crate::syntax::types::Ty;
 use crate::utils::{spanned, Spanned};
 
 use super::Parser;
@@ -93,14 +94,13 @@ impl<'p> Parser<'p> {
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Equal {
                 self.advance();
+
+                println!("next token: {:?}", self.peek());
             }
 
             let expr = self.parse_expr()?;
             value = Some(expr);
         }
-
-        // self.expect(TokenKind::Equal)?;
-        // let expr = self.parse_expr()?;
 
         Ok(spanned(
             Stmt::Let {

@@ -2,8 +2,9 @@
 //! This is split from `typechk.rs` to keep the codebase clean and organized
 
 use crate::middle::typecheck::Typecheck;
-use crate::syntax::ast::{Expr, Literal, Numeric, Ty};
+use crate::syntax::ast::{Expr, Literal};
 use crate::syntax::lexer::{BinOp, SourceLoc};
+use crate::syntax::types::{Numeric, Ty};
 use crate::utils::{spanned, Spanned};
 
 use super::typecheck::{self, TypeError};
@@ -101,7 +102,9 @@ impl<'tc> Typecheck<'tc> {
                 Ok(spanned(Expr::Tuple(casted_elems), expr.location.clone()))
             }
             Expr::StructCons { fields: _ } => {
-                // We cant directly cast a struct to another struct, we can only wrap it in a cast node
+                // Since we cant directly cast a struct to another struct, we can only wrap it in a cast node
+                // This would be nonsensical to allow this kind of cast
+
                 if !just_wrap_in_cast {
                     return Err(TypeError::InvalidCast {
                         from: Ty::Unchecked,
@@ -151,7 +154,12 @@ impl<'tc> Typecheck<'tc> {
         expr: &Spanned<Expr>,
         target_ty: &Ty,
     ) -> typecheck::Return<Spanned<Expr>> {
-        self.cast_expr(expr, target_ty, false)
+        // Special case for struct constructors
+        if let Expr::StructCons { fields } = &expr.target {
+            self.cast_expr(expr, target_ty, true)
+        } else {
+            self.cast_expr(expr, target_ty, false)
+        }
     }
 
     pub(crate) fn infer_literal(&mut self, lit: &Literal) -> typecheck::Return<Ty> {
@@ -337,6 +345,17 @@ impl<'tc> Typecheck<'tc> {
                         location: expr.location.clone(),
                     })
                 }
+            }
+            Expr::StructCons { fields } => {
+                let mut fields_ = Vec::new();
+                for (name, expr) in fields {
+                    fields_.push((name.clone(), self.infer_expr(expr)?));
+                }
+
+                Ok(Ty::Struct {
+                    name: "_anon".to_string(),
+                    fields: fields_,
+                })
             }
             Expr::ArrayIndex { array, index } => self.infer_arraylike_index(array, index),
             Expr::Call { callee, args } => match &callee.target {

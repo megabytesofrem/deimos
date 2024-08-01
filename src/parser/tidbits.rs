@@ -2,9 +2,9 @@
 //! They don't fit anywhere else so they are in tidbits.rs
 
 use crate::parser;
-use crate::syntax::ast::*;
 use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::TokenKind;
+use crate::syntax::types::{Numeric, Ty};
 
 use super::Parser;
 type Param = (String, Ty);

@@ -1,11 +1,19 @@
-enum ETest
-    Foo,
-    Bar,
-    Baz,
+-- enum ETest
+--     Foo,
+--     Bar,
+--     Baz,
+-- end
+
+-- function print(x: string)
+-- end
+
+-- function sum(n:i32, m:i32): i32
+-- end
+
+struct Foo
+    a: i32
 end
 
-function print(x: string)
-end
-
-function sum(n:i32, m:i32): i32
+function main()
+    let foo: Foo = { a: 1 }
 end

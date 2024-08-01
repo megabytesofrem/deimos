@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use super::module_info::ModuleInfo;
-use crate::syntax::ast::Ty;
+use crate::syntax::types::Ty;
 
 #[derive(Debug, Clone)]
 pub struct Resolver {
