@@ -87,14 +87,26 @@ impl<'p> Parser<'p> {
         self.expect(TokenKind::Colon)?;
         let ty = self.parse_type()?;
 
-        self.expect(TokenKind::Equal)?;
-        let expr = self.parse_expr()?;
+        let mut value: Option<Spanned<Expr>> = None;
+
+        // Optionally expect an equal sign and an expression
+        if let Some(token) = self.peek() {
+            if token.kind == TokenKind::Equal {
+                self.advance();
+            }
+
+            let expr = self.parse_expr()?;
+            value = Some(expr);
+        }
+
+        // self.expect(TokenKind::Equal)?;
+        // let expr = self.parse_expr()?;
 
         Ok(spanned(
             Stmt::Let {
                 name: ident.literal.to_string(),
                 ty: Some(ty),
-                value: Some(expr),
+                value,
             },
             t.location,
         ))
@@ -295,7 +307,6 @@ impl<'p> Parser<'p> {
                 TokenKind::KwEnum => self.parse_enum_declare(),
                 TokenKind::KwFunction => self.parse_function_declare(),
                 TokenKind::KwExtern => self.parse_extern_declare(),
-                TokenKind::KwModule => self.parse_module_declare(),
 
                 // Unexpected token
                 _ => Err(SyntaxError::UnexpectedToken {
@@ -317,18 +328,6 @@ impl<'p> Parser<'p> {
         }
 
         result
-    }
-
-    fn parse_module_declare(&mut self) -> parser::Return<ToplevelStmt> {
-        // module name
-        //    functions
-        // end
-        let token = self.expect(TokenKind::KwModule)?;
-        let name = self.expect(TokenKind::Name)?;
-
-        //let mut module_info = ModuleInfo::new(name.literal.to_string());
-
-        todo!("Implement module parsing")
     }
 
     fn parse_extern_declare(&mut self) -> parser::Return<ToplevelStmt> {

@@ -7,7 +7,7 @@ use crate::syntax::ast::{Ast, Block, Expr, Literal, Stmt, ToplevelStmt, Ty};
 use crate::syntax::lexer::SourceLoc;
 use crate::utils::Spanned;
 
-use super::name_resolver::ScopeStack;
+use super::name_resolver::Resolver;
 use super::typed_ast::*;
 
 #[derive(Debug, Clone, Error, PartialEq)]
@@ -57,7 +57,7 @@ pub(crate) type Returns<'cx, T> = anyhow::Result<T, Vec<TypeError>>;
 // Type checker pass
 #[derive(Debug, Clone)]
 pub struct Typecheck<'tc> {
-    ctx: ScopeStack,
+    ctx: Resolver,
     marker: std::marker::PhantomData<&'tc ()>,
 
     pub errors: Vec<TypeError>,
@@ -66,13 +66,13 @@ pub struct Typecheck<'tc> {
 impl<'tc> Typecheck<'tc> {
     pub fn new() -> Self {
         Typecheck {
-            ctx: ScopeStack::new(),
+            ctx: Resolver::new(),
             marker: std::marker::PhantomData,
             errors: Vec::new(),
         }
     }
 
-    pub(crate) fn get_typing_context(&self) -> &ScopeStack {
+    pub(crate) fn get_typing_context(&self) -> &Resolver {
         &self.ctx
     }
 

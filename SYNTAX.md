@@ -1,8 +1,11 @@
 # Deimos Syntax Specification
+⚠️ means that the feature is marked __unstable__ and likely to change without warning.
+The whole language is in flux as it is under active development, but some features more so. 
 
 ## Comments
 ```
 -- A single line comment
+--- Doc comment
 ```
 
 ## Types
@@ -12,14 +15,15 @@
 - Floating point: `f32, f64`
 - Pointers: `*type`
 - Arrays: `[]type`
+- User defined structures: `Employee` or `fs::File`
 
-Generics are not supported yet.
+⚠️ Generics are not supported yet. ⚠️
 
 ## Import and extern
 - `extern` is used to mark a function, or type as externally defined from C. 
 - `import` is used to import a file
 
-⚠️ `extern` will be deprecated soon when modules are added, and will be repurposed as a modifier keyword.
+⚠️ `extern` will be deprecated soon when modules are added, and will be repurposed as a modifier keyword. ⚠️
 
 Consider the below snippet which could be part of a bridge to a C API, like SDL2.
 ```lua
@@ -78,26 +82,37 @@ function quote_armstrong()
 
     -- Return without an expression returns void
     return
+end
+```
+
+## Structs and enums
+```lua
+struct Employee
+    name: string,
+    pay: i32,
+    job: JobRole
+end
+
+-- Enums
+-- Enum members are not namespaced for now
+enum JobRole
+    R_Janitor,
+    R_Accountant,
+    R_Engineer,
+end
 ```
 
 ## Modules
-Modules are a way to store related functions and variables (usually constants). 
-Modules are desugared at compile-time and are the future replacement for the `extern` keyword, due
-to them supporting a limited form of namespacing (as of current, modules cannot contain nested modules).
+Modules are a way to store related functions and variables (usually constants).
+
+Each file defines a module named after itself, and one module can refer to another module using `::` operator e.g `mathy::square` below.
 
 ```lua
-module mathy
-    let PI: f32 = 3.14159
-
-    function sum(a:i32, b:i32):i32
-        return a + b
-    end
-
-    -- csquare is defined externally in C, called mathy_csquare (read above for why)
-    extern function csquare(n:i32): i322    
+-- in mathy.dms
+function square(n:i32): i32
+    return n * n
 end
 
--- Usage:
-let value_of_pi: f32 = mathy::PI
-let sum: i32 = mathy::sum(1, 2)
+-- usage from main.dms:
+let five_squared: i32 = mathy::square(5)
 ```

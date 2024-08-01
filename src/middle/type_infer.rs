@@ -26,7 +26,13 @@ impl<'tc> Typecheck<'tc> {
                 let src_ty = self.infer_literal(&lit)?;
 
                 // Check if we can cast from a source type to a target type
-                assert!(src_ty.can_cast_into(target_ty));
+                if !src_ty.can_cast_into(target_ty) {
+                    return Err(TypeError::InvalidCast {
+                        from: src_ty,
+                        into: target_ty.clone(),
+                        location: expr.location.clone(),
+                    });
+                }
 
                 if src_ty == *target_ty {
                     return Ok(expr.clone());

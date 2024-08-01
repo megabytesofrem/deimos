@@ -1,0 +1,25 @@
+-- Dummy definitions to get it to "compile"
+
+function print(s: string)
+end
+
+function mod(n:i32, m:i32): i32
+
+end
+
+function main()
+    let name: string = ""
+    print("Fizzbuzz of the next 10 numbers")
+
+    for i = 1, 10 do
+        if mod(i, 3) == 0 then
+            print("Fizz")
+        elif mod(i, 5) == 0 then
+            print("Buzz")
+        else
+            if mod(i, 15) == 0 then
+                print("Fizzbuzz")
+            end
+        end
+    end
+end

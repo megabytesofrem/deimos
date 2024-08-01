@@ -49,6 +49,12 @@ pub enum Ty {
     UserDefined(String),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum StructureKind {
+    Struct,
+    Enum,
+}
+
 impl Ty {
     pub fn is_primitive(&self) -> bool {
         matches!(self, Ty::Number(_) | Ty::Bool | Ty::Char | Ty::String)
@@ -72,6 +78,7 @@ impl Ty {
 
     pub fn can_cast_into(&self, other: &Ty) -> bool {
         match (self, other) {
+            (_, other) if self == other => true,
             (Ty::Number(_), Ty::Number(_)) => true,
             (Ty::Pointer(_), Ty::Pointer(_)) => true,
             (Ty::Array(_), Ty::Array(_)) => true,

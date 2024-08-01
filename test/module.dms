@@ -1,0 +1,11 @@
+enum ETest
+    Foo,
+    Bar,
+    Baz,
+end
+
+function print(x: string)
+end
+
+function sum(n:i32, m:i32): i32
+end

@@ -73,6 +73,8 @@ pub enum TokenKind {
     ScopeResolution,
 
     // Keywords
+    #[token("public")]
+    KwPublic,
     #[token("let")]
     KwLet,
     #[token("struct")]
@@ -83,8 +85,6 @@ pub enum TokenKind {
     KwFunction,
     #[token("extern")]
     KwExtern,
-    #[token("module")]
-    KwModule,
     #[token("import")]
     KwImport,
     #[token("cast")]
