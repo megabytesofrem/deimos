@@ -1,10 +1,10 @@
 //! Parsing of statements and blocks.
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
-use crate::parser;
 use crate::syntax::ast::*;
-use crate::syntax::errors::SyntaxError;
-use crate::syntax::lexer::{Token, TokenKind};
+use crate::syntax::lexer::{SourceLoc, Token, TokenKind};
+use crate::syntax::parser;
+use crate::syntax::parser::parse_error::SyntaxError;
 use crate::syntax::types::Ty;
 use crate::utils::{spanned, Spanned};
 
@@ -114,13 +114,15 @@ impl<'p> Parser<'p> {
 
     fn parse_ident_or_assign(&mut self) -> parser::Return<Spanned<Stmt>> {
         // ident = expr or ident(expr, expr, ...)
-        let ident = self.expect(TokenKind::Name)?;
+        let ident = self.parse_qualified_name()?;
+        let name = ident.0.clone();
+
         match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::Equal => self.parse_assign_stmt(ident),
                 TokenKind::LParen => {
-                    let expr = self.parse_function_call(ident.literal.to_string())?;
-                    Ok(spanned(Stmt::Expr(expr), ident.location))
+                    let expr = self.parse_function_call(name)?;
+                    Ok(spanned(Stmt::Expr(expr), ident.1))
                 }
                 _ => Err(SyntaxError::UnexpectedToken {
                     token: token.kind.clone(),
@@ -132,19 +134,17 @@ impl<'p> Parser<'p> {
         }
     }
 
-    fn parse_assign_stmt(&mut self, ident: Token) -> parser::Return<Spanned<Stmt>> {
+    fn parse_assign_stmt(&mut self, ident: (String, SourceLoc)) -> parser::Return<Spanned<Stmt>> {
         // ident = expr
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
+
         Ok(spanned(
             Stmt::Assign {
-                target: spanned(
-                    Expr::QualifiedName(ident.literal.to_string()),
-                    ident.location.clone(),
-                ),
+                target: spanned(Expr::QualifiedName(ident.0), ident.1.clone()),
                 value: expr,
             },
-            ident.location,
+            ident.1,
         ))
     }
 

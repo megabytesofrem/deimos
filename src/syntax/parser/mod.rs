@@ -2,13 +2,14 @@
 
 use crate::syntax::ast::Ast;
 use crate::syntax::ast::ToplevelStmt;
-use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::SourceLoc;
 use crate::syntax::lexer::{LexerIter, Token, TokenKind};
+use crate::syntax::parser::parse_error::SyntaxError;
 use crate::utils::spanned;
 use crate::utils::Spanned;
 
 mod expr;
+mod parse_error;
 mod stmt;
 mod tidbits;
 

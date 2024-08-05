@@ -1,9 +1,9 @@
 //! A few teeny-tiny parsers used frequently throughout the parser.
 //! They don't fit anywhere else so they are in tidbits.rs
 
-use crate::parser;
-use crate::syntax::errors::SyntaxError;
 use crate::syntax::lexer::TokenKind;
+use crate::syntax::parser;
+use crate::syntax::parser::parse_error::SyntaxError;
 use crate::syntax::types::{Numeric, Ty};
 
 use super::Parser;

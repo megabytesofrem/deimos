@@ -1,7 +1,7 @@
 use crate::syntax::types::{Numeric, Ty};
 
 #[derive(Debug, Clone)]
-pub(crate) struct PrettyPrinter {
+pub struct PrettyPrinter {
     indent: String,
     pub lines: Vec<String>,
 }
@@ -39,11 +39,24 @@ impl PrettyPrinter {
 }
 
 impl Ty {
-    pub fn to_prototype(&self) -> String {
-        "".to_string()
+    pub fn to_prototype(&self, printer: &PrettyPrinter) -> String {
+        // c prototype: return_type (*function_name)(args)
+        // match self {
+        //     Ty::Function(ret, args) => {
+        //         let mut prototype = format!("{} (*_anon_fn)(", ret.to_c_type(printer));
+        //         for arg in args {
+        //             prototype.push_str(&arg.to_c_type(printer));
+        //             prototype.push_str(", ");
+        //         }
+        //         prototype.push_str(")");
+        //         prototype
+        //     }
+        //     _ => "".to_string(),
+        // }
+        todo!()
     }
 
-    pub fn to_c_type(&self) -> String {
+    pub fn to_c_type(&self, printer: &PrettyPrinter) -> String {
         match self {
             Ty::Number(n) => match n {
                 Numeric::I16 => "i16".to_string(),
@@ -60,7 +73,7 @@ impl Ty {
             Ty::String => "char *".to_string(),
             Ty::Void => "void".to_string(),
             Ty::Unchecked => "void".to_string(),
-            Ty::Function(_ret, _args) => self.to_prototype(),
+            ///Ty::Function(_ret, _args) => self.to_prototype(printer),
             _ => "void".to_string(),
         }
     }

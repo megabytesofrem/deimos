@@ -2,10 +2,8 @@ use std::error::Error;
 
 use clap::Parser as Clap;
 
-use deimos::middle::module_info::ModuleBuilder;
-// use deimos::backend::transpile::Transpiler;
-use deimos::middle::typecheck::Typecheck;
-use deimos::parser::Parser;
+use deimos::middle::resolver::Resolver;
+use deimos::syntax::parser::Parser;
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -14,7 +12,7 @@ struct Args {
 }
 
 fn main() {
-    println!("Deimos compiler v0.0.0.2");
+    println!("Deimos compiler v0.0.0.3");
     println!("================================================================");
     println!("This compiler is a stage1 compiler, only used for bootstrapping.");
     println!("================================================================");
@@ -48,17 +46,18 @@ fn drive<'a>(filename: &'a str, src: &'a str) -> anyhow::Result<()> {
         anyhow::anyhow!("Parsing failed")
     })?;
 
-    let typed_ast = Typecheck::check(ast).map_err(|e| {
-        print_errors(e);
-        anyhow::anyhow!("Type checking failed")
-    })?;
+    println!("{:#?}", ast);
 
-    //println!("{:#?}", typed_ast);
+    // let typed_ast = Typecheck::check(ast).map_err(|e| {
+    //     print_errors(e);
+    //     anyhow::anyhow!("Type checking failed")
+    // })?;
 
-    let mut module_builder = ModuleBuilder::new();
-    let module_info = module_builder.build_module(filename, typed_ast);
+    //let mut module_builder = ModuleResolver::new();
+    //let module_info = module_builder.build_module(filename, typed_ast);
 
-    println!("{:#?}", module_builder.get_mangled_info());
+    // Rerun the type checker, passing the module information
+    //let retyped_ast = Typecheck::println!("{:#?}", module_builder.get_mangled_info());
 
     //let c_header = module_builder.build_header(typed_ast);
 

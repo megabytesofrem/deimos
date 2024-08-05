@@ -1,3 +1,5 @@
+use crate::middle::typed_ast::TBlock;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
     Number(Numeric),
@@ -7,7 +9,7 @@ pub enum Ty {
     Void,
     Unchecked,
 
-    Function(Box<Ty>, Vec<Ty>),
+    Function(Box<FunctionInfo>),
 
     // Arrays decay into pointers ala C
     Pointer(Box<Ty>),
@@ -19,15 +21,9 @@ pub enum Ty {
     // Optional types are implemented at a compiler level
     Optional(Box<Ty>),
 
-    Struct {
-        name: String,
-        fields: Vec<(String, Ty)>,
-    },
+    Struct(StructureInfo),
 
-    Enum {
-        name: String,
-        fields: Vec<String>,
-    },
+    Enum(StructureInfo),
 
     UserDefined(String),
 }
@@ -48,6 +44,25 @@ pub enum Numeric {
 pub enum StructureKind {
     Struct,
     Enum,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructureInfo {
+    // Kind of data structure (struct or enum)
+    pub kind: StructureKind,
+
+    pub name: String,
+    pub fields: Vec<(String, Ty)>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionInfo {
+    pub name: String,
+    pub params: Vec<(String, Ty)>,
+    pub return_type: Ty,
+
+    // Optional function body
+    pub body: Option<TBlock>,
 }
 
 // Type conversion rules used in the typechecker
@@ -84,15 +99,15 @@ impl Ty {
             (_, Ty::Void) | (Ty::Void, _) => true,
 
             // TODO: Check if the struct fields match
-            (Ty::Struct { name, fields: _ }, Ty::UserDefined(other_name))
-            | (Ty::UserDefined(other_name), Ty::Struct { name, fields: _ }) => {
-                name == other_name || name == "_anon"
+            (Ty::Struct(info), Ty::UserDefined(other_name))
+            | (Ty::UserDefined(other_name), Ty::Struct(info)) => {
+                info.name == *other_name || info.name == "_anon"
             }
 
             // TODO: Check if the enum fields match
-            (Ty::Enum { name, fields: _ }, Ty::UserDefined(other_name))
-            | (Ty::UserDefined(other_name), Ty::Enum { name, fields: _ }) => {
-                name == other_name || name == "_anon"
+            (Ty::Enum(info), Ty::UserDefined(other_name))
+            | (Ty::UserDefined(other_name), Ty::Enum(info)) => {
+                info.name == *other_name || info.name == "_anon"
             }
             _ => false,
         }

@@ -87,13 +87,13 @@ pub enum TToplevelStmt {
     ExternDecl {
         name: String,
         params: Vec<(String, Ty)>,
-        return_ty: Ty,
+        return_type: Ty,
     },
 
     FunctionDecl {
         name: String,
         params: Vec<(String, Ty)>,
-        return_ty: Ty,
+        return_type: Ty,
         body: TBlock,
     },
 }

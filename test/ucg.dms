@@ -1,0 +1,9 @@
+function main()
+    print("You are dying, 1 = live")
+    let choice: i32 = input()
+    -- if choice == 1
+    --     std::print("You won")
+    -- else
+    --     std::print("You are dead")
+    -- end
+end
