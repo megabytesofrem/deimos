@@ -4,7 +4,7 @@
 use crate::syntax::ast::*;
 use crate::syntax::lexer::{SourceLoc, Token, TokenKind};
 use crate::syntax::parser;
-use crate::syntax::parser::parse_error::SyntaxError;
+use crate::syntax::parser::syntax_error::SyntaxError;
 use crate::syntax::types::Ty;
 use crate::utils::{spanned, Spanned};
 

@@ -5,7 +5,7 @@ use super::Parser;
 use crate::syntax::ast::{Expr, Literal};
 use crate::syntax::lexer::{BinOp, SourceLoc, Token, TokenKind, UnOp};
 use crate::syntax::parser;
-use crate::syntax::parser::parse_error::SyntaxError;
+use crate::syntax::parser::syntax_error::SyntaxError;
 use crate::utils::{spanned, Spanned};
 
 fn strip_quotes(s: &str) -> &str {
@@ -178,23 +178,19 @@ impl<'p> Parser<'p> {
             }
             TokenKind::Name => {
                 let location = self.peek().map(|t| t.location).unwrap_or_default();
-                self.advance();
-
+                let qualified_name = self.parse_qualified_name()?.0;
                 match self.peek().map(|t| t.kind) {
                     Some(TokenKind::LParen) => {
-                        return self.parse_function_call(token.literal.to_string());
+                        return self.parse_function_call(qualified_name.to_string());
                     }
                     Some(TokenKind::LSquare) => {
                         let expr = self.parse_expr()?;
                         return self.parse_array_index(&expr.target);
                     }
-                    _ => {
-                        let qualified_name = self.parse_qualified_name()?.0;
-                        Ok(spanned(
-                            Expr::QualifiedName(token.literal.to_string()),
-                            location,
-                        ))
-                    }
+                    _ => Ok(spanned(
+                        Expr::QualifiedName(qualified_name.to_string()),
+                        location,
+                    )),
                 }
             }
 
@@ -218,7 +214,7 @@ impl<'p> Parser<'p> {
                     location = token.location.clone(); // Update location to the last part of the name
                     self.advance(); // Advance after consuming a name
                 }
-                TokenKind::ScopeResolution => {
+                TokenKind::Dot => {
                     self.advance();
 
                     // Check that the next token is a name
@@ -242,9 +238,7 @@ impl<'p> Parser<'p> {
         //     return Err(SyntaxError::ExpectedQualifiedName { location });
         // }
 
-        println!("Parsed qualified name: {:?}", qualified_name);
-
-        Ok((qualified_name.join("::"), location))
+        Ok((qualified_name.join("."), location))
     }
 
     fn parse_literal(&mut self, token: &Token) -> parser::Return<Literal> {

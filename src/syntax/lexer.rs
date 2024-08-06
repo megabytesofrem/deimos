@@ -69,8 +69,6 @@ pub enum TokenKind {
     StarEq,
     #[token("/=")]
     SlashEq,
-    #[token("::")]
-    ScopeResolution,
 
     // Keywords
     #[token("public")]

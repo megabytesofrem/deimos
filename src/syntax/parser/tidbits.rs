@@ -3,7 +3,7 @@
 
 use crate::syntax::lexer::TokenKind;
 use crate::syntax::parser;
-use crate::syntax::parser::parse_error::SyntaxError;
+use crate::syntax::parser::syntax_error::SyntaxError;
 use crate::syntax::types::{Numeric, Ty};
 
 use super::Parser;
