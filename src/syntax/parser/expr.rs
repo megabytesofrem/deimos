@@ -4,8 +4,7 @@
 use super::Parser;
 use crate::syntax::ast::{Expr, Literal};
 use crate::syntax::lexer::{BinOp, SourceLoc, Token, TokenKind, UnOp};
-use crate::syntax::parser;
-use crate::syntax::parser::syntax_error::SyntaxError;
+use crate::syntax::parser::{self, syntax_error::SyntaxError};
 use crate::utils::{spanned, Spanned};
 
 fn strip_quotes(s: &str) -> &str {
@@ -137,8 +136,6 @@ impl<'p> Parser<'p> {
         let token = self.peek().ok_or(SyntaxError::ExpectedExpr {
             location: location.clone(),
         })?;
-
-        println!("Parsing primary expression: {:?}", token.kind);
 
         match &token.kind {
             TokenKind::Minus | TokenKind::Bang => {

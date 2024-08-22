@@ -1,0 +1,11 @@
+struct Foo
+    a: i32,
+--  a: i32,
+
+    b: string
+end
+
+-- This should error with MultipleDeclarations
+--struct Foo
+--    c: i32
+--end

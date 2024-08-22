@@ -1,6 +1,6 @@
 # Deimos Syntax Specification
 ⚠️ means that the feature is marked __unstable__ and likely to change without warning.
-The whole language is in flux as it is under active development, but some features more so. 
+The whole language is in flux as it is under active development, but some features more so.
 
 ## Comments
 ```
@@ -15,12 +15,12 @@ The whole language is in flux as it is under active development, but some featur
 - Floating point: `f32, f64`
 - Pointers: `*type`
 - Arrays: `[]type`
-- User defined structures: `Employee` or `fs::File`
+- User defined structures: `Employee` or `fs.File`
 
 ⚠️ Generics are not supported yet. ⚠️
 
 ## Import and extern
-- `extern` is used to mark a function, or type as externally defined from C. 
+- `extern` is used to mark a function, or type as externally defined from C.
 - `import` is used to import a file
 
 ⚠️ `extern` will be deprecated soon when modules are added, and will be repurposed as a modifier keyword. ⚠️
@@ -108,11 +108,13 @@ Modules are a way to store related functions and variables (usually constants).
 Each file defines a module named after itself, and one module can refer to another module using `::` operator e.g `mathy::square` below.
 
 ```lua
+
+
 -- in mathy.dms
 function square(n:i32): i32
     return n * n
 end
 
 -- usage from main.dms:
-let five_squared: i32 = mathy::square(5)
+let five_squared: i32 = mathy.square(5)
 ```

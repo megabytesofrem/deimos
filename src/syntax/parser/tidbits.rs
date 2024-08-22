@@ -4,7 +4,7 @@
 use crate::syntax::lexer::TokenKind;
 use crate::syntax::parser;
 use crate::syntax::parser::syntax_error::SyntaxError;
-use crate::syntax::types::{Numeric, Ty};
+use crate::syntax::types::{Sized, Ty};
 
 use super::Parser;
 type Param = (String, Ty);
@@ -21,10 +21,10 @@ impl<'p> Parser<'p> {
             TokenKind::Name => {
                 let ident_or_type = token.literal.to_string();
                 match ident_or_type.as_str() {
-                    "i32" => Ok(Ty::Number(Numeric::I32)),
-                    "i64" => Ok(Ty::Number(Numeric::I64)),
-                    "f32" => Ok(Ty::Number(Numeric::F32)),
-                    "f64" => Ok(Ty::Number(Numeric::F64)),
+                    "i32" => Ok(Ty::Number(Sized::I32)),
+                    "i64" => Ok(Ty::Number(Sized::I64)),
+                    "f32" => Ok(Ty::Number(Sized::F32)),
+                    "f64" => Ok(Ty::Number(Sized::F64)),
                     "char" => Ok(Ty::Char),
                     "bool" => Ok(Ty::Bool),
                     "string" => Ok(Ty::String),

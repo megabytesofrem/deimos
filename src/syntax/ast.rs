@@ -55,7 +55,7 @@ pub enum Stmt {
         value: Option<Spanned<Expr>>,
     },
     Assign {
-        target: Spanned<Expr>,
+        name: Spanned<Expr>,
         value: Spanned<Expr>,
     },
     If {
@@ -72,7 +72,7 @@ pub enum Stmt {
     },
     While {
         cond: Spanned<Expr>,
-        block: Block,
+        body: Block,
     },
 }
 

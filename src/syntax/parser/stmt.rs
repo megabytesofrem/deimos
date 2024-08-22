@@ -3,8 +3,7 @@
 
 use crate::syntax::ast::*;
 use crate::syntax::lexer::{SourceLoc, Token, TokenKind};
-use crate::syntax::parser;
-use crate::syntax::parser::syntax_error::SyntaxError;
+use crate::syntax::parser::{self, syntax_error::SyntaxError};
 use crate::syntax::types::Ty;
 use crate::utils::{spanned, Spanned};
 
@@ -94,8 +93,6 @@ impl<'p> Parser<'p> {
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Equal {
                 self.advance();
-
-                println!("next token: {:?}", self.peek());
             }
 
             let expr = self.parse_expr()?;
@@ -141,7 +138,7 @@ impl<'p> Parser<'p> {
 
         Ok(spanned(
             Stmt::Assign {
-                target: spanned(Expr::QualifiedName(ident.0), ident.1.clone()),
+                name: spanned(Expr::QualifiedName(ident.0), ident.1.clone()),
                 value: expr,
             },
             ident.1,
@@ -278,8 +275,8 @@ impl<'p> Parser<'p> {
         let token = self.expect(TokenKind::KwWhile)?;
         let cond = self.parse_expr()?;
         self.expect(TokenKind::KwDo)?;
-        let block = self.parse_block()?;
-        Ok(spanned(Stmt::While { cond, block }, token.location))
+        let body = self.parse_block()?;
+        Ok(spanned(Stmt::While { cond, body }, token.location))
     }
 
     fn parse_return(&mut self) -> parser::Return<Spanned<Stmt>> {

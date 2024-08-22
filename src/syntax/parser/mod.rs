@@ -1,9 +1,7 @@
 //! The main parser module for Deimos.
 
-use crate::syntax::ast::Ast;
-use crate::syntax::ast::ToplevelStmt;
-use crate::syntax::lexer::SourceLoc;
-use crate::syntax::lexer::{LexerIter, Token, TokenKind};
+use crate::syntax::ast::{Ast, ToplevelStmt};
+use crate::syntax::lexer::{LexerIter, SourceLoc, Token, TokenKind};
 use crate::syntax::parser::syntax_error::SyntaxError;
 use crate::utils::spanned;
 use crate::utils::Spanned;
@@ -13,6 +11,10 @@ mod stmt;
 mod syntax_error;
 mod tidbits;
 
+/// Result type for parsing
+pub(crate) type Return<'p, T> = anyhow::Result<T, SyntaxError>;
+pub(crate) type ReturnErrors<'p, T> = anyhow::Result<T, Vec<SyntaxError>>;
+
 #[derive(Clone)]
 pub struct Parser<'p> {
     tokens: LexerIter<'p>,
@@ -21,10 +23,6 @@ pub struct Parser<'p> {
     line: usize,
     col: usize,
 }
-
-/// Result type for parsing
-pub(crate) type Return<'p, T> = anyhow::Result<T, SyntaxError>;
-pub(crate) type ReturnErrors<'p, T> = anyhow::Result<T, Vec<SyntaxError>>;
 
 impl<'p> Parser<'p> {
     pub fn new(tokens: LexerIter<'p>) -> Self {

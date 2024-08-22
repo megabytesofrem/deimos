@@ -5,8 +5,8 @@
 //! 2. Name resolution
 //! 3. Building a module from a file
 
-pub mod module;
 pub mod resolver;
-// pub mod type_infer;
-// pub mod typecheck;
+pub mod sema_error;
+pub mod type_infer;
+pub mod typecheck;
 pub mod typed_ast;

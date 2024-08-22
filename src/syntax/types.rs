@@ -1,12 +1,14 @@
-use crate::middle::typed_ast::TBlock;
+use crate::sema::typed_ast::TBlock;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
-    Number(Numeric),
+    Number(Sized),
     Bool,
     Char,
     String,
     Void,
+
+    // Types that are not known yet are marked as unchecked, to be resolved later
     Unchecked,
 
     Function(Box<FunctionInfo>),
@@ -15,21 +17,17 @@ pub enum Ty {
     Pointer(Box<Ty>),
     Array(Box<Ty>),
 
-    // (ty1, ty2, ...)
-    Tuple(Vec<Ty>),
-
     // Optional types are implemented at a compiler level
     Optional(Box<Ty>),
 
     Struct(StructureInfo),
-
     Enum(StructureInfo),
 
     UserDefined(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Numeric {
+pub enum Sized {
     I16,
     I32,
     I64,
@@ -59,7 +57,7 @@ pub struct StructureInfo {
 pub struct FunctionInfo {
     pub name: String,
     pub params: Vec<(String, Ty)>,
-    pub return_type: Ty,
+    pub return_ty: Ty,
 
     // Optional function body
     pub body: Option<TBlock>,
@@ -87,29 +85,15 @@ impl Ty {
     pub fn is_indexable_type(&self) -> bool {
         matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::UserDefined(_))
     }
+}
 
-    pub fn can_cast_into(&self, other: &Ty) -> bool {
-        match (self, other) {
-            (_, other) if self == other => true,
-            (Ty::Number(_), Ty::Number(_)) => true,
-            (Ty::Pointer(_), Ty::Pointer(_)) => true,
-            (Ty::Array(_), Ty::Array(_)) => true,
-            (Ty::UserDefined(_), Ty::UserDefined(_)) => true,
-            (_, Ty::Unchecked) | (Ty::Unchecked, _) => true,
-            (_, Ty::Void) | (Ty::Void, _) => true,
-
-            // TODO: Check if the struct fields match
-            (Ty::Struct(info), Ty::UserDefined(other_name))
-            | (Ty::UserDefined(other_name), Ty::Struct(info)) => {
-                info.name == *other_name || info.name == "_anon"
-            }
-
-            // TODO: Check if the enum fields match
-            (Ty::Enum(info), Ty::UserDefined(other_name))
-            | (Ty::UserDefined(other_name), Ty::Enum(info)) => {
-                info.name == *other_name || info.name == "_anon"
-            }
-            _ => false,
+impl FunctionInfo {
+    pub fn named_function(name: String, params: Vec<(String, Ty)>, return_ty: Ty) -> Self {
+        Self {
+            name,
+            params,
+            return_ty,
+            body: None,
         }
     }
 }

@@ -27,10 +27,7 @@ impl<T> Spanned<T> {
         }
     }
 
-    pub fn flat_map_spanned<U, E, F: FnOnce(T) -> Result<U, E>>(
-        self,
-        f: F,
-    ) -> Result<Spanned<U>, E> {
+    pub fn map_with_span<U, E, F: FnOnce(T) -> Result<U, E>>(self, f: F) -> Result<Spanned<U>, E> {
         let spanned = f(self.target)?;
         Ok(Spanned {
             target: spanned,

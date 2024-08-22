@@ -1,4 +1,4 @@
 pub mod backend;
-pub mod middle;
+pub mod sema;
 pub mod syntax;
 pub mod utils;

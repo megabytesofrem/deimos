@@ -44,12 +44,13 @@ pub enum TStmt {
         value: Option<Spanned<TExpr>>,
     },
     Assign {
-        target: TExpr,
+        name: TExpr,
         value: Spanned<TExpr>,
     },
     If {
         cond: Spanned<TExpr>,
         then_block: TBlock,
+        elif_blocks: Vec<(Spanned<TExpr>, TBlock)>,
         else_block: Option<TBlock>,
     },
     For {
@@ -60,7 +61,7 @@ pub enum TStmt {
     },
     While {
         cond: Spanned<TExpr>,
-        block: TBlock,
+        body: TBlock,
     },
 }
 
@@ -93,7 +94,7 @@ pub enum TToplevelStmt {
     FunctionDecl {
         name: String,
         params: Vec<(String, Ty)>,
-        return_type: Ty,
+        return_ty: Ty,
         body: TBlock,
     },
 }

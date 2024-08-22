@@ -1,9 +1,6 @@
+
+
 function main()
     print("You are dying, 1 = live")
-    let choice: i32 = std.input()
-    -- if choice == 1
-    --     std::print("You won")
-    -- else
-    --     std::print("You are dead")
-    -- end
+    read(5)
 end
