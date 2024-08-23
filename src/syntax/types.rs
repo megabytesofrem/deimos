@@ -1,6 +1,7 @@
 use crate::sema::typed_ast::TBlock;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Ty {
     Number(Sized),
     Bool,
@@ -26,7 +27,7 @@ pub enum Ty {
     UserDefined(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Sized {
     I16,
     I32,
@@ -38,13 +39,13 @@ pub enum Sized {
     F64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum StructureKind {
     Struct,
     Enum,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct StructureInfo {
     // Kind of data structure (struct or enum)
     pub kind: StructureKind,
@@ -53,7 +54,7 @@ pub struct StructureInfo {
     pub fields: Vec<(String, Ty)>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct FunctionInfo {
     pub name: String,
     pub params: Vec<(String, Ty)>,

@@ -17,7 +17,10 @@ pub(crate) type ReturnErrors<'r, T> = anyhow::Result<T, Vec<SemanticError>>;
 
 #[derive(Debug, Clone)]
 pub struct Typechecker {
+    // The resolver holds information about the current model, declarations, and scopes
+    // (Rc<RefCell> so we can allow multiple, concurrent mutable borrows)
     pub resolver: Rc<RefCell<Resolver>>,
+
     errors: Vec<SemanticError>,
 }
 
@@ -362,13 +365,8 @@ impl<'t> Typechecker {
     }
 
     pub fn check(&mut self, ast: &Ast) -> ReturnErrors<TypedAst> {
-        // Run the resolver on the AST, to populate the symbol table
+        // We logically assume that each file or AST is tied to a single module
         self.resolver.borrow_mut().reset();
-
-        // match self.resolver.borrow_mut().resolve(ast) {
-        //     Ok(_) => (),
-        //     Err(e) => self.errors.extend(e),
-        // }
 
         let mut nodes = Vec::new();
 

@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::syntax::lexer::SourceLoc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Spanned<T> {
     pub target: T,
     pub location: SourceLoc,

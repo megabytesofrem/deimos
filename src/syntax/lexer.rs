@@ -3,9 +3,10 @@ use core::fmt;
 use std::iter::Peekable;
 
 use logos::{Logos, SpannedIter};
+use serde::{Deserialize, Serialize};
 
 /// Report locations in the source code
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct SourceLoc {
     pub line: usize,
 
@@ -139,7 +140,7 @@ pub enum TokenKind {
     NewLine,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum BinOp {
     Add,
     Sub,
@@ -156,7 +157,7 @@ pub enum BinOp {
     GreaterEq,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum UnOp {
     Neg,
     Bang,

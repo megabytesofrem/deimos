@@ -11,3 +11,5 @@ logos = "0.14.0"
 thiserror = "1.0.57"
 anyhow = "1.0.82"
 clap = { version = "4.5.4", features = ["derive"] }
+serde_yml = "0.0.11"
+serde = "1.0.208"

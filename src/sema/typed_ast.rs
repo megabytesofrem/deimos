@@ -4,7 +4,9 @@ use crate::syntax::lexer::{BinOp, UnOp};
 use crate::syntax::types::Ty;
 use crate::utils::Spanned;
 
-#[derive(Debug, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TExpr {
     // Primitive types
     Literal(Literal, Ty),
@@ -32,7 +34,7 @@ pub enum TExpr {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TStmt {
     Expr(TExpr),
     Return(Option<Spanned<TExpr>>),
@@ -67,7 +69,7 @@ pub enum TStmt {
 
 pub type TBlock = Vec<Spanned<TStmt>>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TToplevelStmt {
     Import {
         path: Vec<String>,
@@ -99,7 +101,14 @@ pub enum TToplevelStmt {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct TypedAst {
     pub nodes: Vec<Spanned<TToplevelStmt>>,
+}
+
+impl TypedAst {
+    // Dump the AST as a YAML string using serde-yml for debugging
+    pub fn dump_yaml(&self) -> String {
+        serde_yml::to_string(&self).unwrap()
+    }
 }

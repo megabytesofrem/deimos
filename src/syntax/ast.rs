@@ -1,11 +1,12 @@
 use crate::utils::Spanned;
+use serde::{Deserialize, Serialize};
 
 use super::{
     lexer::{BinOp, SourceLoc, UnOp},
     types::Ty,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Literal {
     Int(i32),
     Float32(f32),
@@ -14,7 +15,7 @@ pub enum Literal {
     String(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Expr {
     // Primitive types
     Literal(Literal),
@@ -43,7 +44,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expr(Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
@@ -78,7 +79,7 @@ pub enum Stmt {
 
 pub type Block = Vec<Spanned<Stmt>>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
     Import {
         path: Vec<String>,
@@ -111,7 +112,7 @@ pub enum ToplevelStmt {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Ast {
     pub comments: Vec<(SourceLoc, String)>,
     pub nodes: Vec<Spanned<ToplevelStmt>>,

@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use clap::Parser as Clap;
 
 use deimos::sema::resolver::Resolver;
@@ -11,6 +9,7 @@ struct Args {
     #[arg(short, long)]
     file: String,
 }
+
 fn main() {
     println!("Deimos compiler v0.0.0.3");
     println!("================================================================");
@@ -38,9 +37,17 @@ fn drive<'a>(filename: &'a str, src: &'a str) -> anyhow::Result<()> {
     let resolver = Resolver::new("main");
 
     let mut typecheck = Typechecker::new(resolver);
-    if let Err(errors) = typecheck.check(&ast) {
-        print_errors(&errors);
-        return Err(anyhow::anyhow!("Typechecking failed"));
+    match typecheck.check(&ast) {
+        Ok(tast) => {
+            println!("Typechecking successful. YAML dump:\n");
+            println!("{}", tast.dump_yaml())
+        }
+        Err(e) => {
+            print_errors(&e);
+            return Err(anyhow::anyhow!(
+                "Typechecking failed with one or more errors"
+            ));
+        }
     }
 
     Ok(())
