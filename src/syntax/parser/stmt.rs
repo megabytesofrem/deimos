@@ -82,6 +82,7 @@ impl<'p> Parser<'p> {
 
     fn parse_let_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
         // let ident:type = expr
+        //
         let t = self.expect(TokenKind::KwLet)?;
         let ident = self.expect(TokenKind::Name)?;
         self.expect(TokenKind::Colon)?;
@@ -93,11 +94,12 @@ impl<'p> Parser<'p> {
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Equal {
                 self.advance();
+                let expr = self.parse_expr()?; // Only parse if there is an '='
+                value = Some(expr);
             }
-
-            let expr = self.parse_expr()?;
-            value = Some(expr);
         }
+
+        println!("Peeked: {:?}", self.peek());
 
         Ok(spanned(
             Stmt::Let {
@@ -133,6 +135,7 @@ impl<'p> Parser<'p> {
 
     fn parse_assign_stmt(&mut self, ident: (String, SourceLoc)) -> parser::Return<Spanned<Stmt>> {
         // ident = expr
+
         self.expect(TokenKind::Equal)?;
         let expr = self.parse_expr()?;
 

@@ -1,4 +1,8 @@
+function print(s: string)
+end
 
+function read(n: i32)
+end
 
 function main()
     print("You are dying, 1 = live")

@@ -1,11 +1,9 @@
-struct Foo
-    a: i32,
---  a: i32,
-
-    b: string
+enum Colors
+    red,
+    green,
+    blue
 end
 
--- This should error with MultipleDeclarations
---struct Foo
---    c: i32
---end
+--let red: i32 = Colors.red
+let green: i32 = Colors.green
+green = Colors.red

@@ -12,6 +12,9 @@ pub enum Ty {
     // Types that are not known yet are marked as unchecked, to be resolved later
     Unchecked,
 
+    // Type variable used for generics later down the line
+    TVar(String),
+
     Function(Box<FunctionInfo>),
 
     // Arrays decay into pointers ala C

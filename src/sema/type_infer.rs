@@ -27,6 +27,9 @@ impl<'t> Typechecker {
         Ok(())
     }
 
+    // TODO: As part of the type checker pass we are going to resolve/unify any generic types to a concrete type
+    // We need to know their context to do this, so it will be a task for later
+
     pub fn check_equal(&self, t1: &Ty, t2: &Ty, location: &SourceLoc) -> bool {
         self.equal(t1, t2, location).is_ok()
     }

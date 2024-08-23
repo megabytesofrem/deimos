@@ -175,6 +175,11 @@ impl<'p> Parser<'p> {
             }
             TokenKind::Name => {
                 let location = self.peek().map(|t| t.location).unwrap_or_default();
+                let qual_name = self.parse_qualified_name()?;
+
+                println!("Location: {:?}, qual name: {:?}", location, qual_name);
+
+                // todo!()
                 let qualified_name = self.parse_qualified_name()?.0;
                 match self.peek().map(|t| t.kind) {
                     Some(TokenKind::LParen) => {
