@@ -54,17 +54,18 @@ impl<'t> Typechecker {
         expr.clone().map_with_span(|texpr| match texpr {
             Expr::Literal(lit) => Ok(TExpr::Literal(lit.clone(), ty)),
 
-            Expr::QualifiedName(name) => {
-                let ty2 = self.lookup_name(&name, expr.location.clone())?;
-                if ty != ty2 {
-                    return Err(SemanticError::TypeMismatch {
-                        expected: ty,
-                        found: ty2,
-                        location: expr.location.clone(),
-                    });
-                }
+            Expr::Member(_name) => {
+                todo!("Member access not implemented yet");
+                // let ty2 = self.lookup_name(&name, expr.location.clone())?;
+                // if ty != ty2 {
+                //     return Err(SemanticError::TypeMismatch {
+                //         expected: ty,
+                //         found: ty2,
+                //         location: expr.location.clone(),
+                //     });
+                // }
 
-                Ok(TExpr::Name(name, ty))
+                // Ok(TExpr::Name(name, ty))
             }
             Expr::BinOp(lhs, op, rhs) => Ok(TExpr::BinOp(
                 Box::new(self.check_expr(&lhs)?),

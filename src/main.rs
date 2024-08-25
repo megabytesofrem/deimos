@@ -34,6 +34,8 @@ fn drive<'a>(filename: &'a str, src: &'a str) -> anyhow::Result<()> {
         anyhow::anyhow!("Parsing failed")
     })?;
 
+    println!("ast = {:#?}", ast);
+
     let resolver = Resolver::new("main");
 
     let mut typecheck = Typechecker::new(resolver);
