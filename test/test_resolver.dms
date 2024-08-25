@@ -4,6 +4,5 @@ enum Colors
     blue
 end
 
---let red: i32 = Colors.red
 let green: i32 = Colors.green
-green = Colors.red
+green = Colors.red()

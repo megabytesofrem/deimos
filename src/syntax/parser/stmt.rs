@@ -81,9 +81,8 @@ impl<'p> Parser<'p> {
     }
 
     fn parse_let_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
-        println!("Parsing let stmt");
+        // println!("Parsing let stmt");
         // let ident:type = expr
-        //
         let t = self.expect(TokenKind::KwLet)?;
         let ident = self.expect(TokenKind::Name)?;
         self.expect(TokenKind::Colon)?;
@@ -100,8 +99,8 @@ impl<'p> Parser<'p> {
             }
         }
 
-        println!("Peeked: {:#?}", self.peek());
-        println!("value: {:#?}", value);
+        // println!("Peeked: {:#?}", self.peek());
+        // println!("value: {:#?}", value);
 
         Ok(spanned(
             Stmt::Let {
@@ -113,16 +112,16 @@ impl<'p> Parser<'p> {
         ))
     }
 
-    // Parses either an expression statement or an assignment statement.
-    // We can't have two separate functions for this because if the statement
-    // starts with an identifier, it could be either an expression (like a
-    // function call) or an assignment.
+    // Parses an expression statement which can be one of the following:
+    // - An assignment
+    // - A function call expression
+    // - An array indexer expression
     fn parse_expr_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
         let token = self.peek().unwrap();
         match &token.kind {
             TokenKind::Name => {
-                let loc = token.location.clone();
-                let ident = spanned(Expr::Ident(token.literal.to_string()), loc);
+                let location = token.location.clone();
+                let ident = spanned(Expr::Ident(token.literal.to_string()), location);
                 self.advance(); // consume the name
 
                 let lvalue = self.parse_postfix_operators(ident)?;
@@ -133,28 +132,27 @@ impl<'p> Parser<'p> {
                             self.advance(); // consume the equal sign
 
                             let rvalue = self.parse_expr()?;
-                            let loc = rvalue.location.clone();
+                            let location = rvalue.location.clone();
                             Ok(spanned(
                                 Stmt::Assign {
                                     name: lvalue,
                                     value: rvalue,
                                 },
-                                loc,
+                                location,
                             ))
                         }
-                        // If the next token isn't an equals sign then it's just
-                        // an expression like a function call or something like that.
+                        // If the next token isn't an equals sign then it's just an expression
                         _ => {
-                            let loc = lvalue.location.clone();
-                            Ok(spanned(Stmt::Expr(lvalue), loc))
+                            let location = lvalue.location.clone();
+                            Ok(spanned(Stmt::Expr(lvalue), location))
                         }
                     }
                 } else {
                     // If there is no next token then we're at the end of the
                     // file and it's just an expression like a function call or
                     // something like that.
-                    let loc = lvalue.location.clone();
-                    Ok(spanned(Stmt::Expr(lvalue), loc))
+                    let location = lvalue.location.clone();
+                    Ok(spanned(Stmt::Expr(lvalue), location))
                 }
             }
             _ => Err(SyntaxError::UnexpectedToken {
@@ -163,22 +161,6 @@ impl<'p> Parser<'p> {
                 location: token.location.clone(),
             }),
         }
-    }
-
-    fn parse_assign_stmt(&mut self, ident: Spanned<Expr>) -> parser::Return<Spanned<Stmt>> {
-        // ident = expr
-
-        self.expect(TokenKind::Equal)?;
-        let expr = self.parse_expr()?;
-
-        let loc = ident.location.clone();
-        Ok(spanned(
-            Stmt::Assign {
-                name: ident,
-                value: expr,
-            },
-            loc,
-        ))
     }
 
     #[allow(unused_assignments)]

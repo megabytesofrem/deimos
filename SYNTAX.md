@@ -47,6 +47,9 @@ end
 
 ## Statements
 
+### Expression Statements
+Some expressions can be used as statements, like function calls and assignments
+
 ### If statement
 ```lua
 if cond then

@@ -3,7 +3,7 @@
 
 use super::Parser;
 use crate::syntax::ast::{Expr, Literal, Member};
-use crate::syntax::lexer::{BinOp, SourceLoc, Token, TokenKind, UnOp};
+use crate::syntax::lexer::{BinOp, Token, TokenKind, UnOp};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
 use crate::utils::{spanned, Spanned};
 
@@ -116,7 +116,6 @@ impl<'p> Parser<'p> {
     }
 
     pub fn parse_expr(&mut self) -> parser::Return<Spanned<Expr>> {
-        println!("Parsing expr");
         self.parse_expr_prec(0)
     }
 
@@ -190,49 +189,60 @@ impl<'p> Parser<'p> {
     }
 
     // Parse postfix operators like function calls, member access, and array
-    // access.  If there is not postfix operator, return the base node.
+    // access.  If there is not a postfix operator, return the base node.
     pub fn parse_postfix_operators(
         &mut self,
         base_node: Spanned<Expr>,
     ) -> parser::Return<Spanned<Expr>> {
-        let location = self.peek().map(|t| t.location).unwrap_or_default();
+        //let location = self.peek().map(|t| t.location).unwrap_or_default();
 
         if let Some(next_token) = self.peek() {
             match next_token.kind {
-                // member access
+                // Member access: foo.bar
                 TokenKind::Dot => {
-                    self.advance();
+                    self.advance(); // Consume the dot
 
-                    let next_token = self.peek().unwrap();
-                    match next_token.kind {
-                        TokenKind::Name => {
-                            let expr = Expr::Member(Member {
-                                target: Box::new(base_node),
-                                name: next_token.literal.to_string(),
-                            });
-                            // Recurse to handle more dots, function calls, etc.
-                            self.parse_postfix_operators(spanned(expr, location))
-                        }
-                        _ => {
-                            Err(SyntaxError::UnexpectedToken {
+                    if let Some(next_token) = self.peek() {
+                        match next_token.kind {
+                            TokenKind::Name => {
+                                let expr = Expr::Member(Member {
+                                    target: Box::new(base_node),
+                                    name: next_token.literal.to_string(),
+                                });
+                                let spanned_expr = spanned(expr, next_token.location.clone());
+                                self.advance(); // Consume the name
+
+                                // Recurse to handle additional postfix operations
+                                self.parse_postfix_operators(spanned_expr)
+                            }
+                            _ => Err(SyntaxError::UnexpectedToken {
                                 token: next_token.kind.clone(),
+                                expected_any: vec![TokenKind::Name],
                                 location: next_token.location.clone(),
-                                expected_any: vec![], // TODO
-                            })
+                            }),
                         }
+                    } else {
+                        Err(SyntaxError::UnexpectedEof)
                     }
                 }
-                // function call
+
+                // Function call: foo()
                 TokenKind::LParen => {
-                    self.advance();
-                    self.parse_function_call(base_node)
+                    let spanned_expr = self.parse_function_call(base_node)?;
+
+                    // Recurse to handle additional postfix operations
+                    self.parse_postfix_operators(spanned_expr)
                 }
-                // array index
+
+                // Array index: foo[0]
                 TokenKind::LSquare => {
-                    let expr = self.parse_expr()?;
-                    self.parse_array_index(&expr.target)
+                    let spanned_expr = self.parse_array_index(&base_node.target)?;
+
+                    // Recurse to handle additional postfix operations
+                    self.parse_postfix_operators(spanned_expr)
                 }
-                _ => Ok(base_node),
+
+                _ => Ok(base_node), // No more postfix operators
             }
         } else {
             Ok(base_node)
@@ -243,7 +253,7 @@ impl<'p> Parser<'p> {
         let location = self.advance().map(|t| t.location).unwrap_or_default();
 
         match token.kind {
-            TokenKind::Integer => Ok(Literal::Int(token.to_int_literal())),
+            TokenKind::Integer | TokenKind::HexInteger => Ok(Literal::Int(token.to_int_literal())),
             TokenKind::Float => Ok(Literal::Float32(token.literal.parse().unwrap())),
             TokenKind::StringLit => Ok(Literal::String(strip_quotes(token.literal).to_string())),
             TokenKind::KwTrue => Ok(Literal::Bool(true)),
