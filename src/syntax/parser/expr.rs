@@ -2,7 +2,7 @@
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
 use super::Parser;
-use crate::syntax::ast::{Expr, Literal};
+use crate::syntax::ast::{Expr, Literal, Member};
 use crate::syntax::lexer::{BinOp, SourceLoc, Token, TokenKind, UnOp};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
 use crate::utils::{spanned, Spanned};
@@ -116,6 +116,7 @@ impl<'p> Parser<'p> {
     }
 
     pub fn parse_expr(&mut self) -> parser::Return<Spanned<Expr>> {
+        println!("Parsing expr");
         self.parse_expr_prec(0)
     }
 
@@ -174,26 +175,9 @@ impl<'p> Parser<'p> {
                 Ok(spanned(Expr::Literal(literal), location))
             }
             TokenKind::Name => {
-                let location = self.peek().map(|t| t.location).unwrap_or_default();
-                let qual_name = self.parse_qualified_name()?;
-
-                println!("Location: {:?}, qual name: {:?}", location, qual_name);
-
-                // todo!()
-                let qualified_name = self.parse_qualified_name()?.0;
-                match self.peek().map(|t| t.kind) {
-                    Some(TokenKind::LParen) => {
-                        return self.parse_function_call(qualified_name.to_string());
-                    }
-                    Some(TokenKind::LSquare) => {
-                        let expr = self.parse_expr()?;
-                        return self.parse_array_index(&expr.target);
-                    }
-                    _ => Ok(spanned(
-                        Expr::QualifiedName(qualified_name.to_string()),
-                        location,
-                    )),
-                }
+                let ident = spanned(Expr::Ident(token.literal.to_string()), location.clone());
+                self.advance(); // consume the name
+                self.parse_postfix_operators(ident)
             }
 
             // Unexpected token, return an error
@@ -205,42 +189,54 @@ impl<'p> Parser<'p> {
         }
     }
 
-    pub fn parse_qualified_name(&mut self) -> parser::Return<(String, SourceLoc)> {
-        let mut qualified_name = Vec::new();
-        let mut location = self.peek().map(|t| t.location).unwrap_or_default();
+    // Parse postfix operators like function calls, member access, and array
+    // access.  If there is not postfix operator, return the base node.
+    pub fn parse_postfix_operators(
+        &mut self,
+        base_node: Spanned<Expr>,
+    ) -> parser::Return<Spanned<Expr>> {
+        let location = self.peek().map(|t| t.location).unwrap_or_default();
 
-        while let Some(token) = self.peek() {
-            match token.kind {
-                TokenKind::Name => {
-                    qualified_name.push(token.literal.to_string());
-                    location = token.location.clone(); // Update location to the last part of the name
-                    self.advance(); // Advance after consuming a name
-                }
+        if let Some(next_token) = self.peek() {
+            match next_token.kind {
+                // member access
                 TokenKind::Dot => {
                     self.advance();
 
-                    // Check that the next token is a name
-                    if let Some(next_token) = self.peek() {
-                        if next_token.kind != TokenKind::Name {
-                            return Err(SyntaxError::UnexpectedToken {
-                                token: next_token.kind.clone(),
-                                expected_any: vec![TokenKind::Name],
-                                location: next_token.location.clone(),
+                    let next_token = self.peek().unwrap();
+                    match next_token.kind {
+                        TokenKind::Name => {
+                            let expr = Expr::Member(Member {
+                                target: Box::new(base_node),
+                                name: next_token.literal.to_string(),
                             });
+                            // Recurse to handle more dots, function calls, etc.
+                            self.parse_postfix_operators(spanned(expr, location))
                         }
-                    } else {
-                        return Err(SyntaxError::UnexpectedEof);
+                        _ => {
+                            Err(SyntaxError::UnexpectedToken {
+                                token: next_token.kind.clone(),
+                                location: next_token.location.clone(),
+                                expected_any: vec![], // TODO
+                            })
+                        }
                     }
                 }
-                _ => break,
+                // function call
+                TokenKind::LParen => {
+                    self.advance();
+                    self.parse_function_call(base_node)
+                }
+                // array index
+                TokenKind::LSquare => {
+                    let expr = self.parse_expr()?;
+                    self.parse_array_index(&expr.target)
+                }
+                _ => Ok(base_node),
             }
+        } else {
+            Ok(base_node)
         }
-
-        // if qualified_name.is_empty() {
-        //     return Err(SyntaxError::ExpectedQualifiedName { location });
-        // }
-
-        Ok((qualified_name.join("."), location))
     }
 
     fn parse_literal(&mut self, token: &Token) -> parser::Return<Literal> {
@@ -257,7 +253,10 @@ impl<'p> Parser<'p> {
         }
     }
 
-    pub(crate) fn parse_function_call(&mut self, name: String) -> parser::Return<Spanned<Expr>> {
+    pub(crate) fn parse_function_call(
+        &mut self,
+        callee: Spanned<Expr>,
+    ) -> parser::Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let mut args = Vec::new();
 
@@ -287,10 +286,7 @@ impl<'p> Parser<'p> {
 
         Ok(spanned(
             Expr::Call {
-                callee: Box::new(spanned(
-                    Expr::QualifiedName(name.to_string()),
-                    location.clone(),
-                )),
+                callee: Box::new(callee),
                 args,
             },
             location,
@@ -346,7 +342,7 @@ impl<'p> Parser<'p> {
         ))
     }
 
-    fn parse_array_index(&mut self, array: &Expr) -> parser::Return<Spanned<Expr>> {
+    fn parse_array_index(&mut self, _array: &Expr) -> parser::Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let array = self.parse_expr()?;
 
@@ -418,28 +414,5 @@ impl<'p> Parser<'p> {
             },
             location,
         ))
-    }
-}
-
-#[cfg(test)]
-mod expr_parse_tests {
-    use crate::syntax::parser::Parser;
-    use crate::*;
-
-    #[test]
-    fn parse_qualified_names() {
-        let qual_names = vec![
-            "foo".to_string(),
-            "foo::bar".to_string(),
-            "foo::bar::baz".to_string(),
-        ];
-
-        for name in qual_names {
-            let mut parser = Parser::new(syntax::lexer::lex_tokens(&name));
-            //let result = parser.parse_qualified_name().unwrap();
-            //assert_eq!(result.join("::"), name);
-
-            //println!("Parsed qualified name: {}", result.join("::"));
-        }
     }
 }

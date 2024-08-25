@@ -16,10 +16,17 @@ pub enum Literal {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Member {
+    pub target: Box<Spanned<Expr>>,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Expr {
     // Primitive types
     Literal(Literal),
-    QualifiedName(String),
+    Ident(String),
+    Member(Member),
     Reference(Box<Spanned<Expr>>),
 
     // Operations

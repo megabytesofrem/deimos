@@ -159,7 +159,10 @@ impl<'t> Typechecker {
     pub fn infer_expr(&self, value: &Spanned<Expr>) -> Return<Ty> {
         match &value.target {
             Expr::Literal(lit) => Ok(self.infer_literal(lit)),
-            Expr::QualifiedName(name) => self.lookup_name(name, value.location.clone()),
+            Expr::Member(_name) => {
+                todo!("Implement member lookup in infer_expr");
+                // self.lookup_name(name, value.location.clone()),
+            }
             Expr::BinOp(lhs, op, rhs) => self.infer_binop_expr(lhs, op, rhs),
             Expr::Array(elems) => self.infer_array_literal(elems),
             Expr::Cast(expr, ty) => {
@@ -189,8 +192,11 @@ impl<'t> Typechecker {
                 }))
             }
             Expr::ArrayIndex { array, index } => self.infer_array_like_index(array, index),
-            Expr::Call { callee, args } => match &callee.target {
-                Expr::QualifiedName(name) => self.infer_call_expr(&name, args),
+            Expr::Call { callee, args: _ } => match &callee.target {
+                Expr::Member(_name) => {
+                    todo!("Implement member lookup in infer_expr");
+                    // self.infer_call_expr(&name, args)
+                }
                 _ => panic!("Cannot call a non-function value"),
             },
             expr => unimplemented!("Unimplemented {:?}", expr),
