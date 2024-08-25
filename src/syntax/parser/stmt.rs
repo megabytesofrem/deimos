@@ -38,7 +38,7 @@ impl<'p> Parser<'p> {
         let result = match self.peek() {
             Some(token) => match token.kind {
                 TokenKind::KwLet => self.parse_let_stmt(),
-                TokenKind::Name => self.parse_ident_or_assign(),
+                TokenKind::Name => self.parse_expr_stmt(),
                 TokenKind::KwIf => self.parse_if_stmt(),
                 TokenKind::KwFor => self.parse_for_loop(),
                 TokenKind::KwWhile => self.parse_while_loop(),
@@ -81,6 +81,7 @@ impl<'p> Parser<'p> {
     }
 
     fn parse_let_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
+        // println!("Parsing let stmt");
         // let ident:type = expr
         let t = self.expect(TokenKind::KwLet)?;
         let ident = self.expect(TokenKind::Name)?;
@@ -93,11 +94,13 @@ impl<'p> Parser<'p> {
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Equal {
                 self.advance();
+                let expr = self.parse_expr()?; // Only parse if there is an '='
+                value = Some(expr);
             }
-
-            let expr = self.parse_expr()?;
-            value = Some(expr);
         }
+
+        // println!("Peeked: {:#?}", self.peek());
+        // println!("value: {:#?}", value);
 
         Ok(spanned(
             Stmt::Let {
@@ -109,40 +112,55 @@ impl<'p> Parser<'p> {
         ))
     }
 
-    fn parse_ident_or_assign(&mut self) -> parser::Return<Spanned<Stmt>> {
-        // ident = expr or ident(expr, expr, ...)
-        let ident = self.parse_qualified_name()?;
-        let name = ident.0.clone();
+    // Parses an expression statement which can be one of the following:
+    // - An assignment
+    // - A function call expression
+    // - An array indexer expression
+    fn parse_expr_stmt(&mut self) -> parser::Return<Spanned<Stmt>> {
+        let token = self.peek().unwrap();
+        match &token.kind {
+            TokenKind::Name => {
+                let location = token.location.clone();
+                let ident = spanned(Expr::Ident(token.literal.to_string()), location);
+                self.advance(); // consume the name
 
-        match self.peek() {
-            Some(token) => match token.kind {
-                TokenKind::Equal => self.parse_assign_stmt(ident),
-                TokenKind::LParen => {
-                    let expr = self.parse_function_call(name)?;
-                    Ok(spanned(Stmt::Expr(expr), ident.1))
+                let lvalue = self.parse_postfix_operators(ident)?;
+
+                if let Some(token) = self.peek() {
+                    match token.kind {
+                        TokenKind::Equal => {
+                            self.advance(); // consume the equal sign
+
+                            let rvalue = self.parse_expr()?;
+                            let location = rvalue.location.clone();
+                            Ok(spanned(
+                                Stmt::Assign {
+                                    name: lvalue,
+                                    value: rvalue,
+                                },
+                                location,
+                            ))
+                        }
+                        // If the next token isn't an equals sign then it's just an expression
+                        _ => {
+                            let location = lvalue.location.clone();
+                            Ok(spanned(Stmt::Expr(lvalue), location))
+                        }
+                    }
+                } else {
+                    // If there is no next token then we're at the end of the
+                    // file and it's just an expression like a function call or
+                    // something like that.
+                    let location = lvalue.location.clone();
+                    Ok(spanned(Stmt::Expr(lvalue), location))
                 }
-                _ => Err(SyntaxError::UnexpectedToken {
-                    token: token.kind.clone(),
-                    expected_any: vec![TokenKind::Equal, TokenKind::LParen],
-                    location: token.location.clone(),
-                }),
-            },
-            None => Err(SyntaxError::UnexpectedEof),
+            }
+            _ => Err(SyntaxError::UnexpectedToken {
+                token: token.kind.clone(),
+                expected_any: vec![TokenKind::Name],
+                location: token.location.clone(),
+            }),
         }
-    }
-
-    fn parse_assign_stmt(&mut self, ident: (String, SourceLoc)) -> parser::Return<Spanned<Stmt>> {
-        // ident = expr
-        self.expect(TokenKind::Equal)?;
-        let expr = self.parse_expr()?;
-
-        Ok(spanned(
-            Stmt::Assign {
-                name: spanned(Expr::QualifiedName(ident.0), ident.1.clone()),
-                value: expr,
-            },
-            ident.1,
-        ))
     }
 
     #[allow(unused_assignments)]

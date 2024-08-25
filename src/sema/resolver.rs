@@ -8,7 +8,6 @@ use crate::syntax::types::Ty;
 
 /// Result type for the name resolver
 pub(crate) type Return<'r, T> = anyhow::Result<T, SemanticError>;
-pub(crate) type ReturnErrors<'r, T> = anyhow::Result<T, Vec<SemanticError>>;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -91,8 +90,6 @@ impl Resolver {
             }
         }
 
-        // TODO: Keep track of the previous symbol prior to this call so we can refer to it
-
         Err(SemanticError::NotInScope {
             name: name.to_string(),
             location: SourceLoc::default(),
@@ -101,12 +98,42 @@ impl Resolver {
 
     // Resolve a name in the current scope starting from the innermost scope
     pub fn resolve_name(&self, name: &str) -> Option<&Ty> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(ty) = scope.get(name) {
-                return Some(ty);
+        let parts: Vec<&str> = name.split('.').collect();
+
+        // Resolve the base name (e.g., `Foo` in `Foo.a`)
+        let mut base_ty = self
+            .scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(parts[0]))?;
+
+        // Resolve everything after the base name
+        for field_name in &parts[1..] {
+            match base_ty {
+                Ty::Struct(ref struct_info) => {
+                    base_ty = struct_info.fields.iter().find_map(|(name, ty)| {
+                        if name == field_name {
+                            Some(ty)
+                        } else {
+                            None
+                        }
+                    })?;
+                }
+                Ty::Enum(ref struct_info) => {
+                    base_ty = struct_info.fields.iter().find_map(|(name, ty)| {
+                        if name == field_name {
+                            Some(ty)
+                        } else {
+                            None
+                        }
+                    })?;
+                }
+
+                // We didn't find a field
+                _ => return None,
             }
         }
 
-        None
+        Some(base_ty)
     }
 }

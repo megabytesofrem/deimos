@@ -34,13 +34,15 @@ fn drive<'a>(filename: &'a str, src: &'a str) -> anyhow::Result<()> {
         anyhow::anyhow!("Parsing failed")
     })?;
 
+    println!("ast = {:#?}", ast);
+
     let resolver = Resolver::new("main");
 
     let mut typecheck = Typechecker::new(resolver);
     match typecheck.check(&ast) {
         Ok(tast) => {
-            println!("Typechecking successful. YAML dump:\n");
-            println!("{}", tast.dump_yaml())
+            println!("Typechecking successful.");
+            //println!("{:#?}", tast)
         }
         Err(e) => {
             print_errors(&e);

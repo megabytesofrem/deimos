@@ -54,17 +54,18 @@ impl<'t> Typechecker {
         expr.clone().map_with_span(|texpr| match texpr {
             Expr::Literal(lit) => Ok(TExpr::Literal(lit.clone(), ty)),
 
-            Expr::QualifiedName(name) => {
-                let ty2 = self.lookup_name(&name, expr.location.clone())?;
-                if ty != ty2 {
-                    return Err(SemanticError::TypeMismatch {
-                        expected: ty,
-                        found: ty2,
-                        location: expr.location.clone(),
-                    });
-                }
+            Expr::Member(_name) => {
+                todo!("Member access not implemented yet");
+                // let ty2 = self.lookup_name(&name, expr.location.clone())?;
+                // if ty != ty2 {
+                //     return Err(SemanticError::TypeMismatch {
+                //         expected: ty,
+                //         found: ty2,
+                //         location: expr.location.clone(),
+                //     });
+                // }
 
-                Ok(TExpr::Name(name, ty))
+                // Ok(TExpr::Name(name, ty))
             }
             Expr::BinOp(lhs, op, rhs) => Ok(TExpr::BinOp(
                 Box::new(self.check_expr(&lhs)?),
@@ -124,16 +125,19 @@ impl<'t> Typechecker {
                 let ty = ty.clone().unwrap_or(Ty::Unchecked);
 
                 // TODO: Perform type casting before we call check_expr here
-                if let Some(value) = value {
-                    let value = self.check_expr(&value)?;
-                    Ok(TStmt::Let {
-                        name: name.clone(),
-                        ty: Some(ty),
-                        value: Some(value),
-                    })
-                } else {
-                    panic!()
-                }
+                let maybe_value = value.as_ref().or(None);
+                let value = maybe_value
+                    .map(|value| self.check_expr(value))
+                    .transpose()?;
+
+                // Insert the name into the resolver
+                self.resolver.borrow_mut().insert_name(&name, ty.clone())?;
+
+                Ok(TStmt::Let {
+                    name: name.clone(),
+                    ty: Some(ty),
+                    value,
+                })
             }
             Stmt::Assign { name, value } => {
                 let location = stmt.location.clone();
@@ -274,14 +278,6 @@ impl<'t> Typechecker {
             .borrow_mut()
             .insert_name(name, Ty::Struct(structure_info))?;
 
-        // For now, we just pollute the global scope with the fields
-        // TODO: Scope this to the structure itself
-        for (field_name, field_ty) in fields {
-            self.resolver
-                .borrow_mut()
-                .insert_name(field_name, field_ty.clone())?;
-        }
-
         Ok(TToplevelStmt::StructDecl {
             name: name.to_string(),
             fields: fields.to_vec(),
@@ -310,14 +306,6 @@ impl<'t> Typechecker {
         self.resolver
             .borrow_mut()
             .insert_name(name, Ty::Struct(structure_info))?;
-
-        // For now, we just pollute the global scope with the fields
-        // TODO: Scope this to the structure itself
-        for field in fields {
-            self.resolver
-                .borrow_mut()
-                .insert_name(field, Ty::Number(Sized::I32))?;
-        }
 
         Ok(TToplevelStmt::EnumDecl {
             name: name.to_string(),

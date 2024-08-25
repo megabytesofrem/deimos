@@ -5,6 +5,15 @@ use std::iter::Peekable;
 use logos::{Logos, SpannedIter};
 use serde::{Deserialize, Serialize};
 
+/// TODO:
+/// instead of storing the line number and column, we can store the start/end
+/// position only and then calculate the line/column when needed.  You'll need
+/// the original input string to do this.
+///
+/// We don't actually need the line number and column info of each node, we only
+/// need to calculate it when reporting an error for those couple of positions
+/// we care about.
+
 /// Report locations in the source code
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct SourceLoc {
@@ -136,6 +145,8 @@ pub enum TokenKind {
     #[regex(r"[ \t\f]+", logos::skip, priority = 2)]
     Whitespace,
 
+    // We're skipping newlines because, the enum parser (and probably other parts
+    // of the parser) don't know how to deal with newlines yet.
     #[regex(r"[\r\n]+", logos::skip)]
     NewLine,
 }
