@@ -3,8 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use super::sema_error::SemanticError;
+use crate::syntax::ast_types::Ty;
 use crate::syntax::lexer::SourceLoc;
-use crate::syntax::types::Ty;
 
 /// Result type for the name resolver
 pub(crate) type Return<'r, T> = anyhow::Result<T, SemanticError>;

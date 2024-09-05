@@ -1,11 +1,11 @@
 //! Parsing of statements and blocks.
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
+use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::*;
+use crate::syntax::ast_types::Ty;
 use crate::syntax::lexer::{SourceLoc, Token, TokenKind};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
-use crate::syntax::types::Ty;
-use crate::utils::{spanned, Spanned};
 
 use super::Parser;
 
@@ -56,7 +56,6 @@ impl<'p> Parser<'p> {
                 }
 
                 // Unexpected token
-                // Commented until I add support for comments
                 _ => Err(SyntaxError::UnexpectedToken {
                     token: token.kind.clone(),
                     expected_any: vec![

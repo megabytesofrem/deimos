@@ -2,82 +2,17 @@
 //! The expression parser is split into another file to keep the codebase clean and organized.
 
 use super::Parser;
+use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::{Expr, Literal, Member};
 use crate::syntax::lexer::{BinOp, Token, TokenKind, UnOp};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
-use crate::utils::{spanned, Spanned};
 
 fn strip_quotes(s: &str) -> &str {
     &s[1..s.len() - 1]
 }
 
-impl TokenKind {
-    fn to_binop(&self) -> BinOp {
-        match self {
-            TokenKind::Plus => BinOp::Add,
-            TokenKind::Minus => BinOp::Sub,
-            TokenKind::Star => BinOp::Mul,
-            TokenKind::Slash => BinOp::Div,
-            TokenKind::DoubleEq => BinOp::Eq,
-            TokenKind::BangEq => BinOp::BangEq,
-            TokenKind::Less => BinOp::Less,
-            TokenKind::LessEq => BinOp::LessEq,
-            TokenKind::Greater => BinOp::Greater,
-            TokenKind::GreaterEq => BinOp::GreaterEq,
-            _ => panic!("Invalid binary operator: {:?}", self),
-        }
-    }
-
-    fn to_unop(&self) -> UnOp {
-        match self {
-            TokenKind::Minus => UnOp::Neg,
-            TokenKind::Bang => UnOp::Bang,
-            _ => panic!("Invalid unary operator: {:?}", self),
-        }
-    }
-
-    pub(crate) fn get_precedence(&self) -> u8 {
-        match self {
-            TokenKind::Plus | TokenKind::Minus => 10,
-            TokenKind::Star | TokenKind::Slash => 20,
-            TokenKind::DoubleEq | TokenKind::BangEq => 5,
-            TokenKind::Less
-            | TokenKind::LessEq
-            | TokenKind::Greater
-            | TokenKind::GreaterEq
-            | TokenKind::PlusEq
-            | TokenKind::MinusEq
-            | TokenKind::StarEq
-            | TokenKind::SlashEq => 5,
-            TokenKind::Bang | TokenKind::KwAnd | TokenKind::KwOr => 2,
-
-            // Either not a binary operator or not implemented yet
-            _ => 0,
-        }
-    }
-
-    pub(crate) fn is_binop(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Star
-                | TokenKind::Slash
-                | TokenKind::DoubleEq
-                | TokenKind::BangEq
-                | TokenKind::Less
-                | TokenKind::LessEq
-                | TokenKind::Greater
-                | TokenKind::GreaterEq
-        )
-    }
-
-    pub(crate) fn is_unop(&self) -> bool {
-        matches!(self, TokenKind::Minus | TokenKind::Bang)
-    }
-}
-
 impl<'p> Parser<'p> {
+    // TODO: Does this handle left/right associativity at all?
     fn parse_expr_prec(&mut self, min_prec: u8) -> parser::Return<Spanned<Expr>> {
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let mut lhs = self.parse_main_expr()?;
@@ -393,6 +328,8 @@ impl<'p> Parser<'p> {
 
     fn parse_struct_constructor(&mut self) -> parser::Return<Spanned<Expr>> {
         // {field1: value1, field2: value2}
+        self.advance();
+
         let location = self.peek().map(|t| t.location).unwrap_or_default();
         let mut fields = Vec::new();
 

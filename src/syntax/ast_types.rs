@@ -1,15 +1,20 @@
-use crate::sema::typed_ast::TBlock;
+use crate::sema::{sema_error::SemanticError, typed_ast::TBlock};
 use serde::{Deserialize, Serialize};
+
+use super::lexer::SourceLoc;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Ty {
-    Number(Sized),
+    // A sized number type
+    Number(NumericSize),
+
     Bool,
     Char,
     String,
     Void,
 
-    // Types that are not known yet are marked as unchecked, to be resolved later
+    // Types that are not known yet are marked as unchecked, to be resolved later.
+    // This was a hold over from the original design, but is not currently used
     Unchecked,
 
     // Type variable used for generics later down the line
@@ -27,11 +32,12 @@ pub enum Ty {
     Struct(StructureInfo),
     Enum(StructureInfo),
 
+    // A user defined type (alias of a struct or enum)
     UserDefined(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum Sized {
+pub enum NumericSize {
     I16,
     I32,
     I64,
@@ -88,6 +94,21 @@ impl Ty {
 
     pub fn is_indexable_type(&self) -> bool {
         matches!(self, Ty::Array(_) | Ty::Pointer(_) | Ty::UserDefined(_))
+    }
+}
+
+impl StructureInfo {
+    /// Look up a field in a struct or enum and return its type (or an error)
+    pub fn lookup_field(&self, field_name: &str, location: SourceLoc) -> Result<Ty, SemanticError> {
+        self.fields
+            .iter()
+            .find(|(name, _)| name == field_name)
+            .map(|(_, ty)| ty.clone())
+            .ok_or_else(|| SemanticError::FieldNotFound {
+                struct_name: self.name.clone(),
+                field: field_name.to_string(),
+                location,
+            })
     }
 }
 

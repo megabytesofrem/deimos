@@ -1,10 +1,10 @@
 //! The main parser module for Deimos.
 
+use crate::spanned::spanned;
+use crate::spanned::Spanned;
 use crate::syntax::ast::{Ast, ToplevelStmt};
 use crate::syntax::lexer::{LexerIter, SourceLoc, Token, TokenKind};
 use crate::syntax::parser::syntax_error::SyntaxError;
-use crate::utils::spanned;
-use crate::utils::Spanned;
 
 mod expr;
 mod stmt;

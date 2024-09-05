@@ -1,8 +1,8 @@
+use crate::spanned::Spanned;
 /// Typed AST representation
-use crate::syntax::ast::Literal;
+use crate::syntax::ast::{Literal, Member};
+use crate::syntax::ast_types::Ty;
 use crate::syntax::lexer::{BinOp, UnOp};
-use crate::syntax::types::Ty;
-use crate::utils::Spanned;
 
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +11,12 @@ pub enum TExpr {
     // Primitive types
     Literal(Literal, Ty),
     Name(String, Ty),
+
+    // Whereas Ident is a direct reference to a variable by name, Member is more broad
+    // and usually refers to a field of a struct or enum variant
+    Member(Member, Ty),
+
+    Reference(Box<Spanned<TExpr>>),
 
     // Operations
     BinOp(Box<Spanned<TExpr>>, BinOp, Box<Spanned<TExpr>>),

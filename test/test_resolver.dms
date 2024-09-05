@@ -1,8 +1,0 @@
-enum Colors
-    red,
-    green,
-    blue
-end
-
-let green: i32 = Colors.green
-green = Colors.red()

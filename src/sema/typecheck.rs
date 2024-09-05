@@ -3,10 +3,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::sema::typed_ast::TExpr;
+use crate::spanned::Spanned;
 use crate::syntax::ast::*;
-use crate::syntax::types::{FunctionInfo, StructureInfo, StructureKind};
-use crate::syntax::{lexer::SourceLoc, types::Sized, types::Ty};
-use crate::utils::Spanned;
+use crate::syntax::ast_types::{FunctionInfo, StructureInfo, StructureKind};
+use crate::syntax::{ast_types::NumericSize, ast_types::Ty, lexer::SourceLoc};
 
 use super::resolver::Resolver;
 use super::sema_error::SemanticError;
@@ -44,28 +44,73 @@ impl<'t> Typechecker {
         }
     }
 
+    pub fn lookup_member_access(&self, member: &Member, _location: SourceLoc) -> Return<Ty> {
+        // println!("Looking up member access {:?}", member);
+        let target_ty = self.infer_expr(&member.target)?;
+
+        // Member could be recursive so we will need to take this into account
+
+        match target_ty {
+            Ty::Struct(ref struct_info) | Ty::Enum(ref struct_info) => {
+                if let Ok(field_ty) = struct_info.lookup_field(&member.name, _location.clone()) {
+                    // If there is another member after this, recurse
+                    if let Expr::Member(ref next_member) = member.target.target {
+                        self.lookup_member_access(next_member, _location)
+                    } else {
+                        Ok(field_ty)
+                    }
+                } else {
+                    Err(SemanticError::FieldNotFound {
+                        struct_name: struct_info.name.clone(),
+                        field: member.name.clone(),
+                        location: _location.clone(),
+                    })
+                }
+            }
+
+            _ => Err(SemanticError::NotAValidStructure {
+                found: target_ty,
+                location: _location,
+            }),
+        }
+    }
+
     pub fn check_literal(&mut self, lit: &Literal) -> Return<Ty> {
         Ok(self.infer_literal(lit))
     }
 
     pub fn check_expr(&mut self, expr: &Spanned<Expr>) -> Return<Spanned<TExpr>> {
+        // This function pretty much just does type checking, and wraps it in a TExpr
+        // to build a typed form of the AST, for future codegen usage
+
         let ty = self.infer_expr(expr)?;
 
         expr.clone().map_with_span(|texpr| match texpr {
             Expr::Literal(lit) => Ok(TExpr::Literal(lit.clone(), ty)),
+            Expr::Ident(name) => {
+                let ty2 = self.lookup_name(&name, expr.location.clone())?;
+                if ty != ty2 {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: ty,
+                        found: ty2,
+                        location: expr.location.clone(),
+                    });
+                }
 
-            Expr::Member(_name) => {
-                todo!("Member access not implemented yet");
-                // let ty2 = self.lookup_name(&name, expr.location.clone())?;
-                // if ty != ty2 {
-                //     return Err(SemanticError::TypeMismatch {
-                //         expected: ty,
-                //         found: ty2,
-                //         location: expr.location.clone(),
-                //     });
-                // }
+                Ok(TExpr::Name(name, ty))
+            }
+            Expr::Member(member) => {
+                let ty2 = self.lookup_member_access(&member, expr.location.clone())?;
+                if ty != ty2 {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: ty,
+                        found: ty2,
+                        location: expr.location.clone(),
+                    });
+                }
 
-                // Ok(TExpr::Name(name, ty))
+                Ok(TExpr::Member(member, ty))
+                //todo!("Member access not implemented yet");
             }
             Expr::BinOp(lhs, op, rhs) => Ok(TExpr::BinOp(
                 Box::new(self.check_expr(&lhs)?),
@@ -299,7 +344,7 @@ impl<'t> Typechecker {
             fields: fields
                 .to_vec()
                 .into_iter()
-                .map(|f| (f, Ty::Number(Sized::I32)))
+                .map(|f| (f, Ty::Number(NumericSize::I32)))
                 .collect(),
         };
 

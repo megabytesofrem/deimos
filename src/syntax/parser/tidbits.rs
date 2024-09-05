@@ -1,13 +1,79 @@
 //! A few teeny-tiny parsers used frequently throughout the parser.
 //! They don't fit anywhere else so they are in tidbits.rs
 
-use crate::syntax::lexer::TokenKind;
+use crate::syntax::ast_types::{NumericSize, Ty};
+use crate::syntax::lexer::{BinOp, TokenKind, UnOp};
 use crate::syntax::parser;
 use crate::syntax::parser::syntax_error::SyntaxError;
-use crate::syntax::types::{Sized, Ty};
 
 use super::Parser;
 type Param = (String, Ty);
+
+impl TokenKind {
+    pub fn to_binop(&self) -> BinOp {
+        match self {
+            TokenKind::Plus => BinOp::Add,
+            TokenKind::Minus => BinOp::Sub,
+            TokenKind::Star => BinOp::Mul,
+            TokenKind::Slash => BinOp::Div,
+            TokenKind::DoubleEq => BinOp::Eq,
+            TokenKind::BangEq => BinOp::BangEq,
+            TokenKind::Less => BinOp::Less,
+            TokenKind::LessEq => BinOp::LessEq,
+            TokenKind::Greater => BinOp::Greater,
+            TokenKind::GreaterEq => BinOp::GreaterEq,
+            _ => panic!("Invalid binary operator: {:?}", self),
+        }
+    }
+
+    pub fn to_unop(&self) -> UnOp {
+        match self {
+            TokenKind::Minus => UnOp::Neg,
+            TokenKind::Bang => UnOp::Bang,
+            _ => panic!("Invalid unary operator: {:?}", self),
+        }
+    }
+
+    pub(crate) fn get_precedence(&self) -> u8 {
+        match self {
+            TokenKind::Plus | TokenKind::Minus => 10,
+            TokenKind::Star | TokenKind::Slash => 20,
+            TokenKind::DoubleEq | TokenKind::BangEq => 5,
+            TokenKind::Less
+            | TokenKind::LessEq
+            | TokenKind::Greater
+            | TokenKind::GreaterEq
+            | TokenKind::PlusEq
+            | TokenKind::MinusEq
+            | TokenKind::StarEq
+            | TokenKind::SlashEq => 5,
+            TokenKind::Bang | TokenKind::KwAnd | TokenKind::KwOr => 2,
+
+            // Either not a binary operator or not implemented yet
+            _ => 0,
+        }
+    }
+
+    pub(crate) fn is_binop(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Star
+                | TokenKind::Slash
+                | TokenKind::DoubleEq
+                | TokenKind::BangEq
+                | TokenKind::Less
+                | TokenKind::LessEq
+                | TokenKind::Greater
+                | TokenKind::GreaterEq
+        )
+    }
+
+    pub(crate) fn is_unop(&self) -> bool {
+        matches!(self, TokenKind::Minus | TokenKind::Bang)
+    }
+}
 
 #[allow(dead_code)]
 impl<'p> Parser<'p> {
@@ -21,10 +87,10 @@ impl<'p> Parser<'p> {
             TokenKind::Name => {
                 let ident_or_type = token.literal.to_string();
                 match ident_or_type.as_str() {
-                    "i32" => Ok(Ty::Number(Sized::I32)),
-                    "i64" => Ok(Ty::Number(Sized::I64)),
-                    "f32" => Ok(Ty::Number(Sized::F32)),
-                    "f64" => Ok(Ty::Number(Sized::F64)),
+                    "i32" => Ok(Ty::Number(NumericSize::I32)),
+                    "i64" => Ok(Ty::Number(NumericSize::I64)),
+                    "f32" => Ok(Ty::Number(NumericSize::F32)),
+                    "f64" => Ok(Ty::Number(NumericSize::F64)),
                     "char" => Ok(Ty::Char),
                     "bool" => Ok(Ty::Bool),
                     "string" => Ok(Ty::String),

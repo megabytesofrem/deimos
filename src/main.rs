@@ -34,7 +34,7 @@ fn drive<'a>(filename: &'a str, src: &'a str) -> anyhow::Result<()> {
         anyhow::anyhow!("Parsing failed")
     })?;
 
-    println!("ast = {:#?}", ast);
+    //println!("ast = {:#?}", ast);
 
     let resolver = Resolver::new("main");
 

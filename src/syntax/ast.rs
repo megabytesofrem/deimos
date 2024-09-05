@@ -1,9 +1,9 @@
-use crate::utils::Spanned;
+use crate::spanned::Spanned;
 use serde::{Deserialize, Serialize};
 
 use super::{
+    ast_types::Ty,
     lexer::{BinOp, SourceLoc, UnOp},
-    types::Ty,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -26,7 +26,11 @@ pub enum Expr {
     // Primitive types
     Literal(Literal),
     Ident(String),
+
+    // Whereas Ident is a direct reference to a variable by name, Member is more broad
+    // and usually refers to a field of a struct or enum variant
     Member(Member),
+
     Reference(Box<Spanned<Expr>>),
 
     // Operations
@@ -122,5 +126,7 @@ pub enum ToplevelStmt {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Ast {
     pub comments: Vec<(SourceLoc, String)>,
+
+    // Collection of top-level nodes that make up the AST
     pub nodes: Vec<Spanned<ToplevelStmt>>,
 }

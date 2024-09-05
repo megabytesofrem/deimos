@@ -1,9 +1,9 @@
 //! Implements the type system typer
 
+use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::{Expr, Literal};
+use crate::syntax::ast_types::{FunctionInfo, NumericSize, StructureInfo, StructureKind, Ty};
 use crate::syntax::lexer::{BinOp, SourceLoc};
-use crate::syntax::types::{FunctionInfo, Sized, StructureInfo, StructureKind, Ty};
-use crate::utils::{spanned, Spanned};
 
 use super::sema_error::SemanticError;
 use super::typecheck::{Return, Typechecker};
@@ -91,19 +91,19 @@ impl<'t> Typechecker {
 
     fn cast_literal(&self, lit: &Literal, src_ty: &Ty, target_ty: &Ty) -> Literal {
         match (src_ty, target_ty) {
-            (Ty::Number(Sized::F32), Ty::Number(Sized::F64)) => match lit {
+            (Ty::Number(NumericSize::F32), Ty::Number(NumericSize::F64)) => match lit {
                 Literal::Float32(f) => Literal::Float64(*f as f64),
                 _ => unreachable!(),
             },
-            (Ty::Number(Sized::F64), Ty::Number(Sized::F32)) => match lit {
+            (Ty::Number(NumericSize::F64), Ty::Number(NumericSize::F32)) => match lit {
                 Literal::Float64(f) => Literal::Float32(*f as f32),
                 _ => unreachable!(),
             },
-            (Ty::Number(Sized::F32), Ty::Number(Sized::I32)) => match lit {
+            (Ty::Number(NumericSize::F32), Ty::Number(NumericSize::I32)) => match lit {
                 Literal::Float32(f) => Literal::Int(*f as i32),
                 _ => unreachable!(),
             },
-            (Ty::Number(Sized::F64), Ty::Number(Sized::I32)) => match lit {
+            (Ty::Number(NumericSize::F64), Ty::Number(NumericSize::I32)) => match lit {
                 Literal::Float64(f) => Literal::Int(*f as i32),
                 _ => unreachable!(),
             },
@@ -113,9 +113,9 @@ impl<'t> Typechecker {
 
     pub fn infer_literal(&self, lit: &Literal) -> Ty {
         match lit {
-            Literal::Int(_) => Ty::Number(Sized::I32),
-            Literal::Float32(_) => Ty::Number(Sized::F32),
-            Literal::Float64(_) => Ty::Number(Sized::F64),
+            Literal::Int(_) => Ty::Number(NumericSize::I32),
+            Literal::Float32(_) => Ty::Number(NumericSize::F32),
+            Literal::Float64(_) => Ty::Number(NumericSize::F64),
             Literal::Bool(_) => Ty::Bool,
             Literal::String(_) => Ty::String,
         }
@@ -159,9 +159,9 @@ impl<'t> Typechecker {
     pub fn infer_expr(&self, value: &Spanned<Expr>) -> Return<Ty> {
         match &value.target {
             Expr::Literal(lit) => Ok(self.infer_literal(lit)),
-            Expr::Member(_name) => {
-                todo!("Implement member lookup in infer_expr");
-                // self.lookup_name(name, value.location.clone()),
+            Expr::Ident(name) => self.lookup_name(name, value.location.clone()),
+            Expr::Member(member) => {
+                self.lookup_member_access(member, member.target.location.clone())
             }
             Expr::BinOp(lhs, op, rhs) => self.infer_binop_expr(lhs, op, rhs),
             Expr::Array(elems) => self.infer_array_literal(elems),
@@ -192,10 +192,11 @@ impl<'t> Typechecker {
                 }))
             }
             Expr::ArrayIndex { array, index } => self.infer_array_like_index(array, index),
-            Expr::Call { callee, args: _ } => match &callee.target {
-                Expr::Member(_name) => {
+            Expr::Call { callee, args } => match &callee.target {
+                Expr::Ident(name) => self.infer_call_expr(name, args),
+                Expr::Member(member) => {
                     todo!("Implement member lookup in infer_expr");
-                    // self.infer_call_expr(&name, args)
+                    //self.infer_call_expr(&member, args)
                 }
                 _ => panic!("Cannot call a non-function value"),
             },
@@ -284,7 +285,7 @@ impl<'t> Typechecker {
 
         if !index_ty.is_index_type() {
             return Err(SemanticError::TypeMismatch {
-                expected: Ty::Number(Sized::I32),
+                expected: Ty::Number(NumericSize::I32),
                 found: index_ty,
                 location: index.location.clone(),
             });
