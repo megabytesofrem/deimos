@@ -1,4 +1,7 @@
 //! Type checker pass for the compiler.
+//!
+//! In reality, this is one _giant_ pass that performs type checking, type inference and substitution
+//! of type variables to allow for generics later down the line.
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -6,10 +9,11 @@ use crate::sema::typed_ast::TExpr;
 use crate::spanned::Spanned;
 use crate::syntax::ast::*;
 use crate::syntax::ast_types::{FunctionInfo, StructureInfo, StructureKind};
-use crate::syntax::{ast_types::NumericSize, ast_types::Ty, lexer::SourceLoc};
+use crate::syntax::{ast_types::SizedNumber, ast_types::Ty, lexer::SourceLoc};
 
 use super::resolver::Resolver;
 use super::sema_error::SemanticError;
+use super::type_infer::SubstitutionEnv;
 use super::typed_ast::{TStmt, TToplevelStmt, TypedAst};
 
 pub(crate) type Return<'r, T> = anyhow::Result<T, SemanticError>;
@@ -21,6 +25,9 @@ pub struct Typechecker {
     // (Rc<RefCell> so we can allow multiple, concurrent mutable borrows)
     pub resolver: Rc<RefCell<Resolver>>,
 
+    // The substitution environment represents a mapping of type variables and concrete types.
+    pub subst: RefCell<SubstitutionEnv>,
+
     errors: Vec<SemanticError>,
 }
 
@@ -28,6 +35,7 @@ impl<'t> Typechecker {
     pub fn new(resolver: Resolver) -> Self {
         Self {
             resolver: Rc::new(RefCell::new(resolver)),
+            subst: RefCell::new(SubstitutionEnv::new()),
             errors: Vec::new(),
         }
     }
@@ -344,7 +352,7 @@ impl<'t> Typechecker {
             fields: fields
                 .to_vec()
                 .into_iter()
-                .map(|f| (f, Ty::Number(NumericSize::I32)))
+                .map(|f| (f, Ty::Number(SizedNumber::I32)))
                 .collect(),
         };
 

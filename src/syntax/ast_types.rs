@@ -6,7 +6,7 @@ use super::lexer::SourceLoc;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Ty {
     // A sized number type
-    Number(NumericSize),
+    Number(SizedNumber),
 
     Bool,
     Char,
@@ -17,10 +17,10 @@ pub enum Ty {
     // This was a hold over from the original design, but is not currently used
     Unchecked,
 
-    // Type variable used for generics later down the line
-    TVar(String),
-
     Function(Box<FunctionInfo>),
+
+    // A type variable (used in type inference)
+    TVar(usize),
 
     // Arrays decay into pointers ala C
     Pointer(Box<Ty>),
@@ -37,7 +37,7 @@ pub enum Ty {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum NumericSize {
+pub enum SizedNumber {
     I16,
     I32,
     I64,
@@ -82,6 +82,24 @@ impl Ty {
 
     pub fn is_numeric(&self) -> bool {
         matches!(self, Ty::Number(_))
+    }
+
+    pub fn is_signed_int(&self) -> bool {
+        matches!(
+            self,
+            Ty::Number(SizedNumber::I16)
+                | Ty::Number(SizedNumber::I32)
+                | Ty::Number(SizedNumber::I64)
+        )
+    }
+
+    pub fn is_unsigned_int(&self) -> bool {
+        matches!(
+            self,
+            Ty::Number(SizedNumber::U16)
+                | Ty::Number(SizedNumber::U32)
+                | Ty::Number(SizedNumber::U64)
+        )
     }
 
     pub fn is_pointer(&self) -> bool {

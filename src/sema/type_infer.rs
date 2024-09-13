@@ -1,8 +1,10 @@
 //! Implements the type system typer
 
+use std::collections::HashMap;
+
 use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::{Expr, Literal};
-use crate::syntax::ast_types::{FunctionInfo, NumericSize, StructureInfo, StructureKind, Ty};
+use crate::syntax::ast_types::{FunctionInfo, SizedNumber, StructureInfo, StructureKind, Ty};
 use crate::syntax::lexer::{BinOp, SourceLoc};
 
 use super::sema_error::SemanticError;
@@ -12,6 +14,9 @@ use super::typecheck::{Return, Typechecker};
 // and statements.
 //
 // All functions take an unchecked Expr or Stmt and return a type
+
+// The substitution environment represents a mapping of type variables and concrete types.
+pub type SubstitutionEnv = HashMap<usize, Ty>;
 
 impl<'t> Typechecker {
     /// Returns Ok if the types are the same based on equality, otherwise an error
@@ -29,6 +34,124 @@ impl<'t> Typechecker {
 
     // TODO: As part of the type checker pass we are going to resolve/unify any generic types to a concrete type
     // We need to know their context to do this, so it will be a task for later
+
+    // Unification and substitution below
+    fn contains_typevar(&self, ty: &Ty, tv: usize) -> bool {
+        match ty {
+            // Check if tv matches the other type variable (tv2)
+            Ty::TVar(tv2) => tv == *tv2,
+
+            // Recurse to check if the type variable is contained in the type
+            Ty::Function(f) => {
+                f.params.iter().any(|(_, ty)| self.contains_typevar(ty, tv))
+                    || self.contains_typevar(&f.return_ty, tv)
+            }
+            Ty::Pointer(ty) | Ty::Array(ty) | Ty::Optional(ty) => self.contains_typevar(ty, tv),
+            Ty::Struct(s) | Ty::Enum(s) => {
+                s.fields.iter().any(|(_, ty)| self.contains_typevar(ty, tv))
+            }
+
+            _ => false,
+        }
+    }
+
+    fn unify_typevar(&self, ty: &Ty, tv: usize, location: &SourceLoc) -> Return<()> {
+        // Check for infinite type expansion (Occurs check)
+        if self.contains_typevar(ty, tv) {
+            return Err(SemanticError::InfTypeExpansion {
+                location: location.clone(),
+            });
+        }
+
+        // Fetch the type variable from the substitution environment and unify it with the type given
+        // If the type variable is not present in the substitution environment, insert it
+        if let Some(bound_ty) = self.subst.borrow().get(&tv).cloned() {
+            self.unify(ty, &bound_ty, location)
+        } else {
+            self.subst.borrow_mut().insert(tv, ty.clone());
+            Ok(())
+        }
+    }
+
+    pub fn unify(&self, t1: &Ty, t2: &Ty, location: &SourceLoc) -> Return<()> {
+        match (t1, t2) {
+            // Unify identical types
+            (Ty::Number(_), Ty::Number(_)) => Ok(()),
+            (Ty::Bool, Ty::Bool) => Ok(()),
+            (Ty::Char, Ty::Char) => Ok(()),
+            (Ty::String, Ty::String) => Ok(()),
+            (Ty::Unchecked, _) | (_, Ty::Unchecked) => Ok(()),
+            _ty_pair if t1 == t2 => Ok(()),
+
+            // Unify type variables
+            (Ty::TVar(v1), t) | (t, Ty::TVar(v1)) => self.unify_typevar(t, *v1, location),
+
+            // Recurse to unify pointers and arrays
+            (Ty::Pointer(a1), Ty::Pointer(a2)) => self.unify(a1, a2, location),
+            (Ty::Array(a1), Ty::Array(a2)) => self.unify(a1, a2, location),
+            (Ty::Optional(a1), Ty::Optional(a2)) => self.unify(a1, a2, location),
+
+            // Unify function types
+            (Ty::Function(f1), Ty::Function(f2)) => {
+                // Unify the return type
+                self.unify(&f1.return_ty, &f2.return_ty, location)?;
+
+                // Unify the argument types
+                if f1.params.len() != f2.params.len() {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: t1.clone(),
+                        found: t2.clone(),
+                        location: location.clone(),
+                    });
+                }
+
+                for (a1, a2) in f1.params.iter().zip(f2.params.iter()) {
+                    // Recurse to unify the argument types of both functions
+                    self.unify(&a1.1, &a2.1, location)?;
+                }
+
+                Ok(())
+            }
+
+            // Unify struct or enum types
+            (Ty::Struct(s1), Ty::Struct(s2)) | (Ty::Enum(s1), Ty::Enum(s2)) => {
+                if s1.fields.len() != s2.fields.len() {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: t1.clone(),
+                        found: t2.clone(),
+                        location: location.clone(),
+                    });
+                }
+
+                for ((name1, ty1), (name2, ty2)) in s1.fields.iter().zip(s2.fields.iter()) {
+                    // Check to make sure the field names match up
+                    if name1 != name2 {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: t1.clone(),
+                            found: t2.clone(),
+                            location: location.clone(),
+                        });
+                    }
+
+                    // Recurse to unify the field types of both structs
+                    self.unify(ty1, ty2, location)?;
+                }
+
+                Ok(())
+            }
+
+            // Unify user-defined types
+            (Ty::UserDefined(u1), Ty::UserDefined(u2)) if u1 == u2 => Ok(()),
+
+            _ => Err(SemanticError::TypeMismatch {
+                expected: t1.clone(),
+                found: t2.clone(),
+
+                // No way to get the location information here
+                location: location.clone(),
+            }),
+        }
+    }
 
     pub fn check_equal(&self, t1: &Ty, t2: &Ty, location: &SourceLoc) -> bool {
         self.equal(t1, t2, location).is_ok()
@@ -91,19 +214,19 @@ impl<'t> Typechecker {
 
     fn cast_literal(&self, lit: &Literal, src_ty: &Ty, target_ty: &Ty) -> Literal {
         match (src_ty, target_ty) {
-            (Ty::Number(NumericSize::F32), Ty::Number(NumericSize::F64)) => match lit {
+            (Ty::Number(SizedNumber::F32), Ty::Number(SizedNumber::F64)) => match lit {
                 Literal::Float32(f) => Literal::Float64(*f as f64),
                 _ => unreachable!(),
             },
-            (Ty::Number(NumericSize::F64), Ty::Number(NumericSize::F32)) => match lit {
+            (Ty::Number(SizedNumber::F64), Ty::Number(SizedNumber::F32)) => match lit {
                 Literal::Float64(f) => Literal::Float32(*f as f32),
                 _ => unreachable!(),
             },
-            (Ty::Number(NumericSize::F32), Ty::Number(NumericSize::I32)) => match lit {
+            (Ty::Number(SizedNumber::F32), Ty::Number(SizedNumber::I32)) => match lit {
                 Literal::Float32(f) => Literal::Int(*f as i32),
                 _ => unreachable!(),
             },
-            (Ty::Number(NumericSize::F64), Ty::Number(NumericSize::I32)) => match lit {
+            (Ty::Number(SizedNumber::F64), Ty::Number(SizedNumber::I32)) => match lit {
                 Literal::Float64(f) => Literal::Int(*f as i32),
                 _ => unreachable!(),
             },
@@ -113,9 +236,9 @@ impl<'t> Typechecker {
 
     pub fn infer_literal(&self, lit: &Literal) -> Ty {
         match lit {
-            Literal::Int(_) => Ty::Number(NumericSize::I32),
-            Literal::Float32(_) => Ty::Number(NumericSize::F32),
-            Literal::Float64(_) => Ty::Number(NumericSize::F64),
+            Literal::Int(_) => Ty::Number(SizedNumber::I32),
+            Literal::Float32(_) => Ty::Number(SizedNumber::F32),
+            Literal::Float64(_) => Ty::Number(SizedNumber::F64),
             Literal::Bool(_) => Ty::Bool,
             Literal::String(_) => Ty::String,
         }
@@ -126,6 +249,8 @@ impl<'t> Typechecker {
         let rhs_ty = self.infer_expr(rhs)?;
 
         let location = lhs.location.clone();
+
+        self.unify(&lhs_ty, &rhs_ty, &location)?;
         self.equal(&lhs_ty, &rhs_ty, &location)?;
 
         match op {
@@ -151,8 +276,6 @@ impl<'t> Typechecker {
                 self.equal(&lhs_ty, &Ty::Bool, &location)?;
                 Ok(Ty::Bool)
             }
-
-            _ => unimplemented!(),
         }
     }
 
@@ -167,6 +290,7 @@ impl<'t> Typechecker {
             Expr::Array(elems) => self.infer_array_literal(elems),
             Expr::Cast(expr, ty) => {
                 let expr_ty = self.infer_expr(expr)?;
+                self.unify(&expr_ty, ty, &value.location)?;
 
                 // TODO: Add casting logic
                 if !self.check_equal(&expr_ty, ty, &value.location) {
@@ -218,6 +342,7 @@ impl<'t> Typechecker {
 
         match callee {
             Ty::Function(info) => {
+                // Ensure that the number of arguments matches the number of parameters
                 if args.len() != info.params.len() {
                     return Err(SemanticError::InvalidArity {
                         expected: info.params.len(),
@@ -229,13 +354,7 @@ impl<'t> Typechecker {
                 // Ensure that all the arguments match the expected types
                 for (arg, param_ty) in args.iter().zip(info.params.iter()) {
                     let arg_ty = self.infer_expr(arg)?;
-                    if arg_ty != param_ty.1 {
-                        return Err(SemanticError::TypeMismatch {
-                            expected: param_ty.1.clone(),
-                            found: arg_ty,
-                            location: arg.location.clone(),
-                        });
-                    }
+                    self.unify(&arg_ty, &param_ty.1, &arg.location)?;
                 }
 
                 Ok(info.return_ty.clone())
@@ -259,15 +378,10 @@ impl<'t> Typechecker {
 
         // Infer the overall type of the array from the first element
         let ty = self.infer_expr(&elems[0])?;
+
         elems.iter().skip(1).try_for_each(|elem| {
             let elem_ty = self.infer_expr(elem)?;
-            if ty != elem_ty {
-                return Err(SemanticError::TypeMismatch {
-                    expected: elem_ty,
-                    found: ty.clone(),
-                    location: elem.location.clone(),
-                });
-            }
+            self.unify(&ty, &elem_ty, &elem.location)?;
 
             Ok(())
         })?;
@@ -285,7 +399,7 @@ impl<'t> Typechecker {
 
         if !index_ty.is_index_type() {
             return Err(SemanticError::TypeMismatch {
-                expected: Ty::Number(NumericSize::I32),
+                expected: Ty::Number(SizedNumber::I32),
                 found: index_ty,
                 location: index.location.clone(),
             });

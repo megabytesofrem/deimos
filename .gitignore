@@ -1,3 +1,3 @@
 /target
-/dont_commit
-/old
+/docs/_minted-*
+/docs/.build

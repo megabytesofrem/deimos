@@ -1,10 +1,9 @@
 //! A few teeny-tiny parsers used frequently throughout the parser.
 //! They don't fit anywhere else so they are in tidbits.rs
 
-use crate::syntax::ast_types::{NumericSize, Ty};
+use crate::syntax::ast_types::{SizedNumber, Ty};
 use crate::syntax::lexer::{BinOp, TokenKind, UnOp};
-use crate::syntax::parser;
-use crate::syntax::parser::syntax_error::SyntaxError;
+use crate::syntax::parser::{self, syntax_error::SyntaxError};
 
 use super::Parser;
 type Param = (String, Ty);
@@ -87,10 +86,10 @@ impl<'p> Parser<'p> {
             TokenKind::Name => {
                 let ident_or_type = token.literal.to_string();
                 match ident_or_type.as_str() {
-                    "i32" => Ok(Ty::Number(NumericSize::I32)),
-                    "i64" => Ok(Ty::Number(NumericSize::I64)),
-                    "f32" => Ok(Ty::Number(NumericSize::F32)),
-                    "f64" => Ok(Ty::Number(NumericSize::F64)),
+                    "i32" => Ok(Ty::Number(SizedNumber::I32)),
+                    "i64" => Ok(Ty::Number(SizedNumber::I64)),
+                    "f32" => Ok(Ty::Number(SizedNumber::F32)),
+                    "f64" => Ok(Ty::Number(SizedNumber::F64)),
                     "char" => Ok(Ty::Char),
                     "bool" => Ok(Ty::Bool),
                     "string" => Ok(Ty::String),

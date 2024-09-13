@@ -3,9 +3,8 @@
 
 use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::*;
-use crate::syntax::ast_types::Ty;
-use crate::syntax::lexer::{SourceLoc, Token, TokenKind};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
+use crate::syntax::{ast_types::Ty, lexer::TokenKind};
 
 use super::Parser;
 

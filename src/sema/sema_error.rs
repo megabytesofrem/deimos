@@ -27,6 +27,9 @@ pub enum SemanticError {
         location: SourceLoc,
     },
 
+    #[error("{location} Infinite type expansion (occurs check)")]
+    InfTypeExpansion { location: SourceLoc },
+
     #[error("{location} Expected arity of '{expected:?}', found '{found:?}'")]
     InvalidArity {
         expected: usize,
