@@ -1,0 +1,162 @@
+#+title: Syntax Specification
+#+date: 2024-09-14
+
+* Readers Note
+The specification for the entire language is in flux, and subject to change without warning.
+Additionally, the specification is written in [[https://orgmode.org][Org]] mode so use Emacs if you intend to edit it.
+
+* Types
+- Signed integers: ~i8, i16, i32, i64~
+- Unsigned integers: ~u8, u16, u32, u64~
+- Pointers: ~*type~
+- Arrays: ~[]type~
+
+Generic types are represented as /type variables/ in the type system, until they are
+later substituted with a concrete type during a process known as *unification*.
+
+* Precedence Table
+| Operators                        | Precedence | Assoc |
+|----------------------------------+------------+-------|
+| Plus, Minus                      |         10 | Left  |
+| Star, Slash                      |         20 | Left  |
+| DoubleEq, BangEq                 |          5 | Left  |
+| Less, LessEq, Greater, GreaterEq |          5 | Left  |
+| PlusEq, MinusEq, StarEq, SlashEq |          5 | Left  |
+| Bang, KwAnd, KwOr                |          2 | Left  |
+
+~!~, ~and~ and ~or~ have the lowest precedence while ~*~ and ~/~ have the highest.
+This means that multiplication and division will be /prioritized/ in the expression parser.
+
+Assignment is not defined as an operator, but it would be *right associative*.
+
+* Syntax
+
+** Comments
+Comments are written the same way as in Lua.
+#+begin_src lua
+  -- A single line comment
+  --- A documentation comment
+#+end_src
+
+** Import
+Each file is its own individual module. For example, a file located in *std/math* would be
+imported as ~import std.math~.
+
+See [[Modules]] for more information on how the module system will work.
+
+#+begin_src
+  import module.function
+
+  ...
+  module.function()
+#+end_src
+
+** Expressions
+- Literals: ~5~, ~3.14~, ~"hello world"~
+- Array literal: ~["cheese", "milk", "eggs"]~, ~[1, 2, 3]~
+- Binary and unary expression: ~1 + 2~, ~-1~
+- Function calls: ~max(1, 2)~
+
+Some expressions can be used as statements (function calls and assignments)
+Array literals cannot mix types, all elements of an array need to be the same type.
+
+** Statements
+*** If statement
+#+begin_src lua
+  if cond then
+     block
+  end
+
+  if cond then
+     then_block
+  else
+     else_block
+  end
+#+end_src
+
+Representation as EBNF
+#+begin_src bnf
+  block = stmt*;
+
+  if_cond = expr;
+  if_stmt = "if" if_cond "then" block ("else" block)? "end";
+#+end_src
+
+*** For and while loops
+#+begin_src lua
+  for i = 0, 10 do
+      block
+  end
+
+  while counter < 10 do
+      block
+  end
+#+end_src
+
+Representation as EBNF
+#+begin_src bnf
+  block = stmt*;
+  for_init = ident "=" expr;
+  for_loop = "for" for_init "," expr "do" block "end";
+
+  while_loop = "while" expr "do" block "end";
+#+end_src
+
+*** Structs and enums
+Structs are the primary way of storing and encapsulating state. Enums are similar to C
+enums in function, but their fields are namespaced to the enum.
+
+#+begin_src
+  struct Employee
+     name: string,
+     pay: i32
+  end
+
+  enum Color
+     red,
+     green,
+     blue
+  end
+#+end_src
+
+Representation as EBNF
+#+begin_src bnf
+  struct_member = ident ":" type;
+  struct_members = (struct_member ",")*
+  struct_decl = "struct" ident struct_members "end";
+
+  enum_field = ident;
+  enum_fields = (enum_field ",")*;
+  enum_decl = "enum" ident enum_fields "end";
+#+end_src
+
+
+#+NAME: Modules
+** Modules
+Modules are a way to store related units of code. Each file defines a module named after itself
+and one module can refer to another module using dot notation.
+
+Modules are heavily in development.
+
+#+begin_src bnf
+  top_level_stmt =
+      function_decl
+    | struct_decl
+    | enum_decl
+    ;
+
+  (* Each file contains a list of top level statements *)
+  (* A module maps to a file *)
+  file_root = top_level_stmt*;
+#+end_src
+
+#+begin_src rust
+  struct Module {
+      file_name: String,
+      module_name: String,
+
+      // Dependencies of this module. A module can import other
+      // modules as child dependencies of itself.
+      dependencies: Vec<Module>,
+  }
+#+end_src

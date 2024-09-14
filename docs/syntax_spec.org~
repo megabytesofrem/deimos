@@ -1,0 +1,69 @@
+#+title: Syntax Specification
+#+date: 2024-09-14
+
+* Types
+- Signed integers: ~i8, i16, i32, i64~
+- Unsigned integers: ~u8, u16, u32, u64~
+- Pointers: ~*type~
+- Arrays: ~[]type~
+
+* Syntax
+** Import
+Each file is its own individual module. For example, a file located in *std/math* would be
+imported as ~import std.math~
+
+#+begin_src
+  import module.path
+#+end_src
+
+
+** Expressions
+- Literals: ~5~, ~3.14~, ~"hello world"~
+- Array literal: ~[1, 2, 3]~
+- Binary and unary expression: ~1 + 2~, ~-1~
+- Function calls: ~max(1, 2)~
+
+Some expressions can be used as statements (function calls and assignments)
+
+** Statements
+*** If statement
+#+begin_src
+  if cond then
+     block
+  end
+
+  if cond then
+     then_block
+  else
+     else_block
+  end
+#+end_src
+
+Representation as EBNF
+#+begin_src bnf
+  block = stmt*;
+
+  if_cond = expr;
+  if_stmt = "if" if_cond "then" block ("else" block)? "end";
+#+end_src
+
+*** For and while loops
+#+begin_src
+  for i = 0, 10 do
+      block
+  end
+
+  while counter < 10 do
+      block
+  end
+#+end_src
+
+Representation as EBNF
+#+begin_src bnf
+  block = stmt*;
+  for_init = ident "=" expr;
+  for_loop = "for" for_init "," expr "do" block "end";
+
+  while_loop = "while" expr "do" block "end";
+#+end_src
+

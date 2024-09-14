@@ -76,7 +76,7 @@ impl<'t> Typechecker {
     pub fn unify(&self, t1: &Ty, t2: &Ty, location: &SourceLoc) -> Return<()> {
         match (t1, t2) {
             // Unify identical types
-            (Ty::Number(_), Ty::Number(_)) => Ok(()),
+            (Ty::Number(ty1), Ty::Number(ty2)) if ty1 == ty2 => Ok(()),
             (Ty::Bool, Ty::Bool) => Ok(()),
             (Ty::Char, Ty::Char) => Ok(()),
             (Ty::String, Ty::String) => Ok(()),
@@ -183,6 +183,7 @@ impl<'t> Typechecker {
         }
     }
 
+    // NOTE: Internal _cast_expr function used by cast_expr above, use the user-facing one instead.
     fn _cast_expr(
         &self,
         expr: &Spanned<Expr>,
@@ -193,6 +194,7 @@ impl<'t> Typechecker {
         match &expr.target {
             Expr::Literal(lit) => {
                 let lit_ty = self.infer_literal(lit);
+                self.unify(&lit_ty, target_ty, &expr.location)?;
                 self.can_perform_cast(&lit_ty, target_ty, &expr.location)?;
 
                 if lit_ty == *target_ty {
@@ -318,8 +320,8 @@ impl<'t> Typechecker {
             Expr::ArrayIndex { array, index } => self.infer_array_like_index(array, index),
             Expr::Call { callee, args } => match &callee.target {
                 Expr::Ident(name) => self.infer_call_expr(name, args),
-                Expr::Member(member) => {
-                    todo!("Implement member lookup in infer_expr");
+                Expr::Member(_member) => {
+                    todo!("Implement member lookup in infer_expr for function calls");
                     //self.infer_call_expr(&member, args)
                 }
                 _ => panic!("Cannot call a non-function value"),
