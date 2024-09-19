@@ -4,7 +4,7 @@
 use super::Parser;
 use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::{Expr, Literal, Member};
-use crate::syntax::lexer::{BinOp, Token, TokenKind, UnOp};
+use crate::syntax::lexer::{Op, Token, TokenKind};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
 
 fn strip_quotes(s: &str) -> &str {
@@ -35,12 +35,12 @@ impl<'p> Parser<'p> {
             if op.is_binop() {
                 let rhs = self.parse_expr_prec(op.get_precedence() + 1)?;
                 lhs = spanned(
-                    Expr::BinOp(Box::new(lhs), op.to_binop(), Box::new(rhs)),
+                    Expr::BinOp(Box::new(lhs), op.to_op(), Box::new(rhs)),
                     location.clone(),
                 );
             } else if op.is_unop() {
                 let rhs = self.parse_expr_prec(op.get_precedence())?;
-                lhs = spanned(Expr::UnOp(op.to_unop(), Box::new(rhs)), location.clone());
+                lhs = spanned(Expr::UnOp(op.to_op(), Box::new(rhs)), location.clone());
             } else {
                 // Not a binary or unary operator, break
                 break;
@@ -76,7 +76,7 @@ impl<'p> Parser<'p> {
             TokenKind::Minus | TokenKind::Bang => {
                 let expr = self.parse_expr()?;
                 Ok(spanned(
-                    Expr::UnOp(token.kind.to_unop(), Box::new(expr)),
+                    Expr::UnOp(token.kind.to_op(), Box::new(expr)),
                     location,
                 ))
             }

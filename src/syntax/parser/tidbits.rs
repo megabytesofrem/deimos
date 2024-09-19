@@ -2,34 +2,27 @@
 //! They don't fit anywhere else so they are in tidbits.rs
 
 use crate::syntax::ast_types::{SizedNumber, Ty};
-use crate::syntax::lexer::{BinOp, TokenKind, UnOp};
+use crate::syntax::lexer::{Op, TokenKind};
 use crate::syntax::parser::{self, syntax_error::SyntaxError};
 
 use super::Parser;
 type Param = (String, Ty);
 
 impl TokenKind {
-    pub fn to_binop(&self) -> BinOp {
+    pub fn to_op(&self) -> Op {
         match self {
-            TokenKind::Plus => BinOp::Add,
-            TokenKind::Minus => BinOp::Sub,
-            TokenKind::Star => BinOp::Mul,
-            TokenKind::Slash => BinOp::Div,
-            TokenKind::DoubleEq => BinOp::Eq,
-            TokenKind::BangEq => BinOp::BangEq,
-            TokenKind::Less => BinOp::Less,
-            TokenKind::LessEq => BinOp::LessEq,
-            TokenKind::Greater => BinOp::Greater,
-            TokenKind::GreaterEq => BinOp::GreaterEq,
-            _ => panic!("Invalid binary operator: {:?}", self),
-        }
-    }
-
-    pub fn to_unop(&self) -> UnOp {
-        match self {
-            TokenKind::Minus => UnOp::Neg,
-            TokenKind::Bang => UnOp::Bang,
-            _ => panic!("Invalid unary operator: {:?}", self),
+            TokenKind::Plus => Op::Add,
+            TokenKind::Minus => Op::Sub,
+            TokenKind::Star => Op::Mul,
+            TokenKind::Slash => Op::Div,
+            TokenKind::DoubleEq => Op::Eq,
+            TokenKind::BangEq => Op::BangEq,
+            TokenKind::Less => Op::Less,
+            TokenKind::LessEq => Op::LessEq,
+            TokenKind::Greater => Op::Greater,
+            TokenKind::GreaterEq => Op::GreaterEq,
+	    TokenKind::Bang => Op::Bang,
+            _ => panic!("Invalid operator kind: {:?}", self),
         }
     }
 

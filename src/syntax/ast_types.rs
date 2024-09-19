@@ -75,6 +75,36 @@ pub struct FunctionInfo {
 
 // Type conversion rules used in the typechecker
 
+impl FunctionInfo {
+    pub fn has_generics(&self) -> bool {
+        // Check if any parameter is a type variable
+        if self.params.iter().any(|(_, ty)| Self::contains_typevar(ty)) {
+            return true;
+        }
+
+        // Check if the return type is a type variable
+        Self::contains_typevar(&self.return_ty)
+    }
+
+    fn contains_typevar(ty: &Ty) -> bool {
+        // Helper function to check whether a type contains any type variables
+        match ty {
+            Ty::TVar(_) => true,
+            Ty::Function(f) => {
+                f.params.iter().any(|(_, t)| Self::contains_typevar(t))
+                    || Self::contains_typevar(&f.return_ty)
+            }
+            Ty::Pointer(inner) | Ty::Array(inner) | Ty::Optional(inner) => {
+                Self::contains_typevar(inner)
+            }
+            Ty::Struct(s) | Ty::Enum(s) => {
+                s.fields.iter().any(|(_, ty)| (Self::contains_typevar(ty)))
+            }
+            _ => false,
+        }
+    }
+}
+
 impl Ty {
     pub fn is_primitive(&self) -> bool {
         matches!(self, Ty::Number(_) | Ty::Bool | Ty::Char | Ty::String)

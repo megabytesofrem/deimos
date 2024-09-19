@@ -152,7 +152,7 @@ pub enum TokenKind {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum BinOp {
+pub enum Op {
     Add,
     Sub,
     Mul,
@@ -166,39 +166,31 @@ pub enum BinOp {
     LessEq,
     Greater,
     GreaterEq,
-}
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum UnOp {
+    // Unary operators
     Neg,
-    Bang,
+    Bang
 }
 
-impl BinOp {
+impl Op {
     pub fn to_str(&self) -> &str {
         match self {
-            BinOp::Add => "+",
-            BinOp::Sub => "-",
-            BinOp::Mul => "*",
-            BinOp::Div => "/",
-            BinOp::Mod => "%",
-            BinOp::And => "and",
-            BinOp::Or => "or",
-            BinOp::Eq => "==",
-            BinOp::BangEq => "!=",
-            BinOp::Less => "<",
-            BinOp::LessEq => "<=",
-            BinOp::Greater => ">",
-            BinOp::GreaterEq => ">=",
-        }
-    }
-}
+            Op::Add => "+",
+            Op::Sub => "-",
+            Op::Mul => "*",
+            Op::Div => "/",
+            Op::Mod => "%",
+            Op::And => "and",
+            Op::Or => "or",
+            Op::Eq => "==",
+            Op::BangEq => "!=",
+	    Op::Less => "<",
+            Op::LessEq => "<=",
+            Op::Greater => ">",
+            Op::GreaterEq => ">=",
 
-impl UnOp {
-    pub fn to_str(&self) -> &str {
-        match self {
-            UnOp::Neg => "-",
-            UnOp::Bang => "!",
+	    Op::Neg => "-",
+	    Op::Bang => "!"
         }
     }
 }

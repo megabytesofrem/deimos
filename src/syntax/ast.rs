@@ -3,11 +3,13 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     ast_types::Ty,
-    lexer::{BinOp, SourceLoc, UnOp},
+    lexer::{Op, SourceLoc},
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Literal {
+    // TODO: Modify this to support numeric constants of different sizes
+    
     Int(i32),
     Float32(f32),
     Float64(f64),
@@ -34,8 +36,8 @@ pub enum Expr {
     Reference(Box<Spanned<Expr>>),
 
     // Operations
-    BinOp(Box<Spanned<Expr>>, BinOp, Box<Spanned<Expr>>),
-    UnOp(UnOp, Box<Spanned<Expr>>),
+    BinOp(Box<Spanned<Expr>>, Op, Box<Spanned<Expr>>),
+    UnOp(Op, Box<Spanned<Expr>>),
 
     Array(Vec<Spanned<Expr>>),
     Tuple(Vec<Spanned<Expr>>),

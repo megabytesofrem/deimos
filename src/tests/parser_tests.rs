@@ -1,7 +1,7 @@
 #![cfg(test)]
 use crate::syntax::ast::{Literal, Member, Stmt};
 use crate::syntax::ast_types::{SizedNumber, Ty};
-use crate::syntax::{ast::Expr, lexer::BinOp, parser::Parser};
+use crate::syntax::{ast::Expr, lexer::Op, parser::Parser};
 
 fn parser(src: &str) -> Parser {
     Parser::new(crate::syntax::lexer::lex_tokens(src))
@@ -39,7 +39,7 @@ fn simple_expr() {
 
     let expected = Expr::BinOp(
         Box::new(Expr::Literal(Literal::Int(1)).spanned_default()),
-        BinOp::Add,
+        Op::Add,
         Box::new(Expr::Literal(Literal::Int(2)).spanned_default()),
     );
 
@@ -52,11 +52,11 @@ fn expr_precedence_nesting() {
 
     let expected = Expr::BinOp(
         Box::new(Expr::Literal(Literal::Int(1)).spanned_default()),
-        BinOp::Add,
+        Op::Add,
         Box::new(
             Expr::BinOp(
                 Box::new(Expr::Literal(Literal::Int(2)).spanned_default()),
-                BinOp::Mul,
+                Op::Mul,
                 Box::new(Expr::Literal(Literal::Int(3)).spanned_default()),
             )
             .spanned_default(),
@@ -179,7 +179,7 @@ fn assign_stmt() {
         name: Expr::Ident("name".to_string()).spanned_default(),
         value: Expr::BinOp(
             Box::new(Expr::Literal(Literal::Int(1)).spanned_default()),
-            BinOp::Add,
+            Op::Add,
             Box::new(Expr::Literal(Literal::Int(2)).spanned_default()),
         )
         .spanned_default(),
@@ -267,7 +267,7 @@ fn return_stmt() {
     let expected = Stmt::Return(Some(
         Expr::BinOp(
             Box::new(Expr::Literal(Literal::Int(1)).spanned_default()),
-            BinOp::Add,
+            Op::Add,
             Box::new(Expr::Literal(Literal::Int(2)).spanned_default()),
         )
         .spanned_default(),

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::spanned::{spanned, Spanned};
 use crate::syntax::ast::{Expr, Literal};
 use crate::syntax::ast_types::{FunctionInfo, SizedNumber, StructureInfo, StructureKind, Ty};
-use crate::syntax::lexer::{BinOp, SourceLoc};
+use crate::syntax::lexer::{Op, SourceLoc};
 
 use super::sema_error::SemanticError;
 use super::typecheck::{Return, Typechecker};
@@ -30,6 +30,51 @@ impl<'t> Typechecker {
         }
 
         Ok(())
+    }
+
+    fn resolve_generic(&self, ty: &Ty) -> Return<Ty> {
+        match ty {
+            Ty::TVar(tv) => {
+                if let Some(bound_ty) = self.subst.borrow().get(tv) {
+                    Ok(bound_ty.clone())
+                } else {
+                    // If the type variable is unbound, return an Error
+                    todo!()
+                }
+            }
+
+            // Recurse to resolve complex types
+            Ty::Array(inner) => Ok(Ty::Array(Box::new(self.resolve_generic(inner)?))),
+            Ty::Pointer(inner) => Ok(Ty::Pointer(Box::new(self.resolve_generic(inner)?))),
+            Ty::Optional(inner) => Ok(Ty::Optional(Box::new(self.resolve_generic(inner)?))),
+            _ => Ok(ty.clone()),
+        }
+    }
+
+    fn specialize_function(&self, func: &FunctionInfo) -> Return<Ty> {
+        // Generate a unique bound name
+        let typename = "i32"; // TODO: add type stringification
+        let unique_name = format!("{}_{}", func.name, typename);
+
+        let concrete_params = func
+            .params
+            .iter()
+            .map(|(name, ty)| {
+                let concrete_ty = self.resolve_generic(ty)?;
+                Ok((name.clone(), concrete_ty))
+            })
+            .collect::<Return<Vec<_>>>()?;
+
+        let concrete_return = self.resolve_generic(&func.return_ty)?;
+
+        let specialized_func = FunctionInfo {
+            name: unique_name,
+            params: concrete_params,
+            return_ty: concrete_return,
+            body: func.body.clone(),
+        };
+
+        Ok(Ty::Function(Box::new(specialized_func)))
     }
 
     // TODO: As part of the type checker pass we are going to resolve/unify any generic types to a concrete type
@@ -93,22 +138,35 @@ impl<'t> Typechecker {
 
             // Unify function types
             (Ty::Function(f1), Ty::Function(f2)) => {
-                // Unify the return type
-                self.unify(&f1.return_ty, &f2.return_ty, location)?;
+                // Check if f1 and f2 contain generics, we need to monomorphize the function
+                // if this is the case.
+		if f1.has_generics() || f2.has_generics() {
+		    let _f1 = self.specialize_function(f1)?;
+		    let _f2 = self.specialize_function(f2)?;
 
-                // Unify the argument types
-                if f1.params.len() != f2.params.len() {
-                    return Err(SemanticError::TypeMismatch {
-                        expected: t1.clone(),
-                        found: t2.clone(),
-                        location: location.clone(),
-                    });
-                }
+		    // Unify the specialized functions together
+		    self.unify(&_f1, &_f2, location)?;
+		}
 
-                for (a1, a2) in f1.params.iter().zip(f2.params.iter()) {
-                    // Recurse to unify the argument types of both functions
-                    self.unify(&a1.1, &a2.1, location)?;
-                }
+		// Existing unification logic for non generic functions
+		else {
+                    // Unify the return type
+                    self.unify(&f1.return_ty, &f2.return_ty, location)?;
+
+                    // Unify the argument types
+                    if f1.params.len() != f2.params.len() {
+			return Err(SemanticError::TypeMismatch {
+                            expected: t1.clone(),
+                            found: t2.clone(),
+                            location: location.clone(),
+			});
+                    }
+
+                    for (a1, a2) in f1.params.iter().zip(f2.params.iter()) {
+			// Recurse to unify the argument types of both functions
+			self.unify(&a1.1, &a2.1, location)?;
+                    }
+		}
 
                 Ok(())
             }
@@ -246,7 +304,7 @@ impl<'t> Typechecker {
         }
     }
 
-    fn infer_binop_expr(&self, lhs: &Spanned<Expr>, op: &BinOp, rhs: &Spanned<Expr>) -> Return<Ty> {
+    fn infer_binop_expr(&self, lhs: &Spanned<Expr>, op: &Op, rhs: &Spanned<Expr>) -> Return<Ty> {
         let lhs_ty = self.infer_expr(lhs)?;
         let rhs_ty = self.infer_expr(rhs)?;
 
@@ -256,7 +314,7 @@ impl<'t> Typechecker {
         self.equal(&lhs_ty, &rhs_ty, &location)?;
 
         match op {
-            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
+            Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Mod => {
                 if !lhs_ty.is_numeric() && rhs_ty != lhs_ty {
                     return Err(SemanticError::TypeMismatch {
                         expected: lhs_ty.clone(),
@@ -267,17 +325,18 @@ impl<'t> Typechecker {
 
                 Ok(lhs_ty)
             }
-            BinOp::And
-            | BinOp::Or
-            | BinOp::Eq
-            | BinOp::BangEq
-            | BinOp::Less
-            | BinOp::LessEq
-            | BinOp::Greater
-            | BinOp::GreaterEq => {
+            Op::And
+            | Op::Or
+            | Op::Eq
+            | Op::BangEq
+            | Op::Less
+            | Op::LessEq
+            | Op::Greater
+            | Op::GreaterEq => {
                 self.equal(&lhs_ty, &Ty::Bool, &location)?;
                 Ok(Ty::Bool)
             }
+	    _ => panic!("Unexpected operator {:?}", op)
         }
     }
 

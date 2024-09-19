@@ -2,7 +2,7 @@ use crate::spanned::Spanned;
 /// Typed AST representation
 use crate::syntax::ast::{Literal, Member};
 use crate::syntax::ast_types::Ty;
-use crate::syntax::lexer::{BinOp, UnOp};
+use crate::syntax::lexer::Op;
 
 use serde::{Deserialize, Serialize};
 
@@ -19,8 +19,8 @@ pub enum TExpr {
     Reference(Box<Spanned<TExpr>>),
 
     // Operations
-    BinOp(Box<Spanned<TExpr>>, BinOp, Box<Spanned<TExpr>>),
-    UnOp(UnOp, Box<Spanned<TExpr>>),
+    BinOp(Box<Spanned<TExpr>>, Op, Box<Spanned<TExpr>>),
+    UnOp(Op, Box<Spanned<TExpr>>),
 
     Array(Vec<Spanned<TExpr>>),
     Tuple(Vec<Spanned<TExpr>>),
