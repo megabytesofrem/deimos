@@ -7,7 +7,7 @@ use crate::{
     syntax::lexer::SourceLoc,
 
     // Import the parse_expr and parse_stmt functions from parser_tests
-    tests::parser_tests::{parse_expr, parse_stmt},
+    syntax::parser::parser_tests::{parse_expr, parse_stmt},
 };
 
 fn typechecker() -> Typechecker {

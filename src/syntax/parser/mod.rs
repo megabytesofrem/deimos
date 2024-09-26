@@ -11,6 +11,8 @@ mod stmt;
 mod syntax_error;
 mod tidbits;
 
+pub mod parser_tests;
+
 /// Result type for parsing
 pub(crate) type Return<'p, T> = anyhow::Result<T, SyntaxError>;
 pub(crate) type ReturnErrors<'p, T> = anyhow::Result<T, Vec<SyntaxError>>;

@@ -32,6 +32,25 @@ impl<'t> Typechecker {
         Ok(())
     }
 
+    fn stringify_type(&self, ty: &Ty) -> String {
+        match ty {
+            Ty::Number(SizedNumber::I16) => "i16".to_string(),
+            Ty::Number(SizedNumber::I32) => "i32".to_string(),
+            Ty::Number(SizedNumber::I64) => "i64".to_string(),
+            Ty::Number(SizedNumber::U16) => "u16".to_string(),
+            Ty::Number(SizedNumber::U32) => "u32".to_string(),
+            Ty::Number(SizedNumber::U64) => "u64".to_string(),
+            Ty::Number(SizedNumber::F32) => "f32".to_string(),
+            Ty::Number(SizedNumber::F64) => "f64".to_string(),
+            Ty::Bool => "b".to_string(),
+            Ty::Char => "c".to_string(),
+            Ty::String => "s".to_string(),
+            Ty::Void => "v".to_string(),
+
+            _ => "_".to_string(),
+        }
+    }
+
     fn resolve_generic(&self, ty: &Ty) -> Return<Ty> {
         match ty {
             Ty::TVar(tv) => {
@@ -53,7 +72,8 @@ impl<'t> Typechecker {
 
     fn specialize_function(&self, func: &FunctionInfo) -> Return<Ty> {
         // Generate a unique bound name
-        let typename = "i32"; // TODO: add type stringification
+        let typename = self.stringify_type(&func.return_ty);
+
         let unique_name = format!("{}_{}", func.name, typename);
 
         let concrete_params = func
@@ -140,33 +160,32 @@ impl<'t> Typechecker {
             (Ty::Function(f1), Ty::Function(f2)) => {
                 // Check if f1 and f2 contain generics, we need to monomorphize the function
                 // if this is the case.
-		if f1.has_generics() || f2.has_generics() {
-		    let _f1 = self.specialize_function(f1)?;
-		    let _f2 = self.specialize_function(f2)?;
+                if f1.has_generics() || f2.has_generics() {
+                    let _f1 = self.specialize_function(f1)?;
+                    let _f2 = self.specialize_function(f2)?;
 
-		    // Unify the specialized functions together
-		    self.unify(&_f1, &_f2, location)?;
-		}
-
-		// Existing unification logic for non generic functions
-		else {
+                    // Unify the specialized functions together
+                    self.unify(&_f1, &_f2, location)?;
+                }
+                // Existing unification logic for non generic functions
+                else {
                     // Unify the return type
                     self.unify(&f1.return_ty, &f2.return_ty, location)?;
 
                     // Unify the argument types
                     if f1.params.len() != f2.params.len() {
-			return Err(SemanticError::TypeMismatch {
+                        return Err(SemanticError::TypeMismatch {
                             expected: t1.clone(),
                             found: t2.clone(),
                             location: location.clone(),
-			});
+                        });
                     }
 
                     for (a1, a2) in f1.params.iter().zip(f2.params.iter()) {
-			// Recurse to unify the argument types of both functions
-			self.unify(&a1.1, &a2.1, location)?;
+                        // Recurse to unify the argument types of both functions
+                        self.unify(&a1.1, &a2.1, location)?;
                     }
-		}
+                }
 
                 Ok(())
             }
@@ -336,7 +355,7 @@ impl<'t> Typechecker {
                 self.equal(&lhs_ty, &Ty::Bool, &location)?;
                 Ok(Ty::Bool)
             }
-	    _ => panic!("Unexpected operator {:?}", op)
+            _ => panic!("Unexpected operator {:?}", op),
         }
     }
 

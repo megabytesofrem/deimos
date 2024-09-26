@@ -11,3 +11,6 @@ pub mod sema_error;
 pub mod type_infer;
 pub mod typecheck;
 pub mod typed_ast;
+
+// Test cases
+mod typecheck_tests;

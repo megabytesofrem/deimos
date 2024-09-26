@@ -1,6 +1,7 @@
 /target
 /docs/_minted-*
 /docs/.build
+/docs/ltximg
 
 # -*- mode: gitignore; -*-
 *~
