@@ -56,8 +56,9 @@ impl<'p> Parser<'p> {
 
     fn parse_main_expr(&mut self) -> parser::Return<Spanned<Expr>> {
         let expected_tokens = [
-            TokenKind::Integer,
-            TokenKind::Float,
+            TokenKind::IntLit,
+            TokenKind::HexIntLit,
+            TokenKind::FloatLit,
             TokenKind::StringLit,
             TokenKind::KwTrue,
             TokenKind::KwFalse,
@@ -100,8 +101,9 @@ impl<'p> Parser<'p> {
             }
 
             // Primitives
-            TokenKind::Integer
-            | TokenKind::Float
+            TokenKind::IntLit
+            | TokenKind::HexIntLit
+            | TokenKind::FloatLit
             | TokenKind::StringLit
             | TokenKind::KwTrue
             | TokenKind::KwFalse => {
@@ -188,8 +190,8 @@ impl<'p> Parser<'p> {
         let location = self.advance().map(|t| t.location).unwrap_or_default();
 
         match token.kind {
-            TokenKind::Integer | TokenKind::HexInteger => Ok(Literal::Int(token.to_int_literal())),
-            TokenKind::Float => Ok(Literal::Float32(token.literal.parse().unwrap())),
+            TokenKind::IntLit | TokenKind::HexIntLit => Ok(Literal::Int(token.to_int_literal())),
+            TokenKind::FloatLit => Ok(Literal::Float32(token.literal.parse().unwrap())),
             TokenKind::StringLit => Ok(Literal::String(strip_quotes(token.literal).to_string())),
             TokenKind::KwTrue => Ok(Literal::Bool(true)),
             TokenKind::KwFalse => Ok(Literal::Bool(false)),

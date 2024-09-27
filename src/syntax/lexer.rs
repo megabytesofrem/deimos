@@ -134,11 +134,11 @@ pub enum TokenKind {
     #[regex(r"[_a-zA-Z][_0-9a-zA-Z]*")]
     Name,
     #[regex(r"[-]?[0-9][0-9]*")]
-    Integer,
+    IntLit,
     #[regex(r"[-]?[0-9]+\.[0-9]+")]
-    Float,
+    FloatLit,
     #[regex(r"0[xX][0-9a-fA-F]+")]
-    HexInteger,
+    HexIntLit,
     #[regex(r#""(\\[\\"]|[^"])*""#)]
     StringLit,
 
@@ -208,13 +208,13 @@ pub struct Token<'a> {
 
 impl Token<'_> {
     pub fn is_int_literal(&self) -> bool {
-        matches!(self.kind, TokenKind::Integer | TokenKind::HexInteger)
+        matches!(self.kind, TokenKind::IntLit | TokenKind::HexIntLit)
     }
 
     pub fn to_int_literal(&self) -> i32 {
         match self.kind {
-            TokenKind::Integer => self.literal.parse().unwrap(),
-            TokenKind::HexInteger => i32::from_str_radix(&self.literal[2..], 16).unwrap(),
+            TokenKind::IntLit => self.literal.parse().unwrap(),
+            TokenKind::HexIntLit => i32::from_str_radix(&self.literal[2..], 16).unwrap(),
             _ => panic!("Not an integer literal"),
         }
     }
