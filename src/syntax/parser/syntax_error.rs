@@ -44,4 +44,8 @@ pub enum SyntaxError {
 
     #[error("{location} Unmatched brackets in expression")]
     UnmatchedBrackets { location: SourceLoc },
+
+    // Pattern matching
+    #[error("{location} Invalid matchee in pattern")]
+    InvalidMatchee { location: SourceLoc },
 }

@@ -41,6 +41,7 @@ impl<'p> Parser<'p> {
                 TokenKind::KwIf => self.parse_if_stmt(),
                 TokenKind::KwFor => self.parse_for_loop(),
                 TokenKind::KwWhile => self.parse_while_loop(),
+                //TokenKind::KwMatch => self.parse_match(),
                 TokenKind::KwReturn => self.parse_return(),
 
                 TokenKind::Comment => {

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 /// we care about.
 
 /// Report locations in the source code
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SourceLoc {
     pub line: usize,
 
@@ -79,6 +79,8 @@ pub enum TokenKind {
     StarEq,
     #[token("/=")]
     SlashEq,
+    #[token("=>")]
+    Arrow,
 
     // Keywords
     #[token("public")]
@@ -109,6 +111,8 @@ pub enum TokenKind {
     KwFor,
     #[token("while")]
     KwWhile,
+    #[token("match")]
+    KwMatch,
     #[token("do")]
     KwDo,
     #[token("end")]
@@ -169,7 +173,7 @@ pub enum Op {
 
     // Unary operators
     Neg,
-    Bang
+    Bang,
 }
 
 impl Op {
@@ -184,13 +188,13 @@ impl Op {
             Op::Or => "or",
             Op::Eq => "==",
             Op::BangEq => "!=",
-	    Op::Less => "<",
+            Op::Less => "<",
             Op::LessEq => "<=",
             Op::Greater => ">",
             Op::GreaterEq => ">=",
 
-	    Op::Neg => "-",
-	    Op::Bang => "!"
+            Op::Neg => "-",
+            Op::Bang => "!",
         }
     }
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::lexer::SourceLoc;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Ty {
     // A sized number type
     Number(SizedNumber),
@@ -36,7 +36,7 @@ pub enum Ty {
     UserDefined(String),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SizedNumber {
     I16,
     I32,
@@ -48,13 +48,13 @@ pub enum SizedNumber {
     F64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StructureKind {
     Struct,
     Enum,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructureInfo {
     // Kind of data structure (struct or enum)
     pub kind: StructureKind,
@@ -63,7 +63,7 @@ pub struct StructureInfo {
     pub fields: Vec<(String, Ty)>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionInfo {
     pub name: String,
     pub params: Vec<(String, Ty)>,
@@ -159,7 +159,6 @@ impl FunctionInfo {
         }
     }
 
-    
     pub fn named_function(name: String, params: Vec<(String, Ty)>, return_ty: Ty) -> Self {
         Self {
             name,

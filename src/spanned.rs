@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::syntax::ast::{Expr, Member, Stmt};
 use crate::syntax::lexer::SourceLoc;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Spanned<T> {
     pub target: T,
     pub location: SourceLoc,
@@ -186,6 +186,8 @@ impl Stmt {
                     .map(|stmt| stmt.target.strip_span().spanned_default())
                     .collect(),
             },
+
+            _ => todo!(),
         }
     }
 }

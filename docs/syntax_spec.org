@@ -102,6 +102,36 @@ Representation as EBNF
   while_loop = "while" expr "do" block "end";
 #+end_src
 
+*** Pattern matching
+Rust like pattern matching will be supported later on the language, along with exhaustivity checking
+
+#+begin_src
+  match expr
+     pat => expr,
+     pat => expr,
+     else => expr,
+  end
+#+end_src
+
+Representation as EBNF:
+#+begin_src bnf
+  match_stmt = "match" expr cases "end";
+  cases = (pattern ",")*;
+
+  pattern = matchee "=>" matcher;
+  matchee =
+   | expr
+   | struct_ctor
+   | "[" (hd <- ident) "," (tl <- ident) "]"
+   | "else" // fallback case
+  
+  // Pattern format:
+  // exp => expr (match on expression exp)
+  // name => expr (match on name exactly)
+  // { member: val } => expr (match on a anonymous struct constructor)
+  // [x, xs] => expr (match on list, partition into x and xs)?
+#+end_src
+
 *** Structs and enums
 Structs are the primary way of storing and encapsulating state. Enums are similar to C
 enums in function, but their fields are namespaced to the enum.

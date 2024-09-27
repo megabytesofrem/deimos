@@ -2,14 +2,15 @@ use crate::spanned::Spanned;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ast_types::Ty,
+    ast_types::{StructureInfo, Ty},
     lexer::{Op, SourceLoc},
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+// TODO: Remove `Serialize`/`Deserialize` derives since it is pretty useless now
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     // TODO: Modify this to support numeric constants of different sizes
-    
     Int(i32),
     Float32(f32),
     Float64(f64),
@@ -17,13 +18,13 @@ pub enum Literal {
     String(String),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Member {
     pub target: Box<Spanned<Expr>>,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     // Primitive types
     Literal(Literal),
@@ -57,7 +58,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expr(Spanned<Expr>),
     Return(Option<Spanned<Expr>>),
@@ -92,7 +93,7 @@ pub enum Stmt {
 
 pub type Block = Vec<Spanned<Stmt>>;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ToplevelStmt {
     Import {
         path: Vec<String>,
@@ -125,7 +126,7 @@ pub enum ToplevelStmt {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     pub comments: Vec<(SourceLoc, String)>,
 
