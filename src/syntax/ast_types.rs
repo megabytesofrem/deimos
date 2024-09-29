@@ -116,6 +116,44 @@ impl Ty {
 }
 
 impl StructureInfo {
+    pub fn new_struct(name: &str) -> Self {
+        StructureInfo {
+            kind: StructureKind::Struct,
+            name: name.to_string(),
+            fields: vec![],
+        }
+    }
+
+    pub fn new_enum(name: &str) -> Self {
+        StructureInfo {
+            kind: StructureKind::Enum,
+            name: name.to_string(),
+            fields: vec![],
+        }
+    }
+
+    /// Helper function to construct a struct with populated fields
+    pub fn new_struct_with_fields(name: &str, fields: Vec<(String, Ty)>) -> Self {
+        StructureInfo {
+            kind: StructureKind::Struct,
+            name: name.to_string(),
+            fields,
+        }
+    }
+
+    /// Helper function to construct a enum with populated fields
+    pub fn new_enum_with_fields(name: &str, fields: Vec<(String, Ty)>) -> Self {
+        StructureInfo {
+            kind: StructureKind::Enum,
+            name: name.to_string(),
+            fields,
+        }
+    }
+
+    pub fn insert_field(&mut self, field_name: &str, field_ty: &Ty) {
+        self.fields.push((field_name.to_string(), field_ty.clone()));
+    }
+
     /// Look up a field in a struct or enum and return its type (or an error)
     pub fn lookup_field(&self, field_name: &str, location: SourceLoc) -> Result<Ty, SemanticError> {
         self.fields

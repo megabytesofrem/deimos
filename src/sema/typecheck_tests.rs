@@ -11,7 +11,7 @@ use crate::{
 };
 
 fn typechecker() -> Typechecker {
-    Typechecker::new(Resolver::new("test_suite"))
+    Typechecker::new("test.dms", Resolver::new("test_suite"))
 }
 
 // Typechecking tests

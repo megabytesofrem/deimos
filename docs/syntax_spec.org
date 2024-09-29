@@ -161,12 +161,24 @@ Representation as EBNF
 #+end_src
 
 
-#+NAME: Modules
 ** Modules
-Modules are a way to store related units of code. Each file defines a module named after itself
-and one module can refer to another module using dot notation.
+Modules are a way to store related units of code. Each file is tied to a single module named after itself.
 
 Modules are heavily in development.
+
+Compiler pipeline (this is related to modules, be /patient/)
+1. Lexing and parsing
+ - During lexical analysis we scan and parse the file into an AST
+
+2. Name resolution
+ - The next step is to perform name resolution on the AST, this happens as part of typechecking
+ - /Here/ is where this becomes relevant, when we see an ~import~ we need to read the file that
+   we are imported and parse it into an /AST/ for resolving imports.
+
+3. Type checking
+ - This step is just turning our un-typed program into a full-typed program. Also elaboration
+   (combined inference and unification) for generics happens here.
+
 
 #+begin_src bnf
   top_level_stmt =
@@ -175,18 +187,26 @@ Modules are heavily in development.
     | enum_decl
     ;
 
-  (* Each file contains a list of top level statements *)
-  (* A module maps to a file *)
+  // Each file contains a list of top level statements
+  // A module maps to a file
   file_root = top_level_stmt*;
 #+end_src
 
 #+begin_src rust
-  struct Module {
-      file_name: String,
-      module_name: String,
+#[derive(Debug, Clone)]
+pub struct ModuleInfo {
+    pub filename: String,
+    pub module_name: String,
 
-      // Dependencies of this module. A module can import other
-      // modules as child dependencies of itself.
-      dependencies: Vec<Module>,
-  }
+    pub child_modules: Vec<ModuleInfo>,
+    pub functions: Vec<FunctionInfo>,
+    pub structures: Vec<StructureInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModuleResolver {
+    // Keep track of the current module information. We will update this
+    // as we resolve the module later on
+    info: ModuleInfo,
+}
 #+end_src

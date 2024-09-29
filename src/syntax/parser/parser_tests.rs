@@ -261,6 +261,15 @@ fn while_loop_stmt() {
 }
 
 #[test]
+fn import_stmt() {
+    let parsed = parser("import foo.bar.baz")
+        .parse_toplevel_stmt()
+        .expect("Failed to parse import statement");
+
+    println!("import_stmt: {:#?}", parsed)
+}
+
+#[test]
 fn return_stmt() {
     let parsed = parse_stmt("return 1 + 2").strip_span();
 

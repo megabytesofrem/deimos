@@ -8,8 +8,11 @@ use std::{cell::RefCell, rc::Rc};
 use crate::sema::typed_ast::TExpr;
 use crate::spanned::Spanned;
 use crate::syntax::ast::*;
-use crate::syntax::ast_types::{FunctionInfo, StructureInfo, StructureKind};
-use crate::syntax::{ast_types::SizedNumber, ast_types::Ty, lexer::SourceLoc};
+
+use crate::syntax::{
+    ast_types::{FunctionInfo, SizedNumber, StructureInfo, StructureKind, Ty},
+    lexer::SourceLoc,
+};
 
 use super::resolver::Resolver;
 use super::sema_error::SemanticError;
@@ -32,9 +35,9 @@ pub struct Typechecker {
 }
 
 impl<'t> Typechecker {
-    pub fn new(resolver: Resolver) -> Self {
+    pub fn new(filename: &str, resolver: Resolver) -> Self {
         Self {
-            resolver: Rc::new(RefCell::new(resolver)),
+            resolver: Rc::new(RefCell::new(resolver.clone())),
             subst: RefCell::new(SubstitutionEnv::new()),
             errors: Vec::new(),
         }
@@ -406,9 +409,8 @@ impl<'t> Typechecker {
     }
 
     pub fn check(&mut self, ast: &Ast) -> ReturnErrors<TypedAst> {
-        // We logically assume that each file or AST is tied to a single module
+        // Clear the resolver out
         self.resolver.borrow_mut().reset();
-
         let mut nodes = Vec::new();
 
         for node in &ast.nodes {

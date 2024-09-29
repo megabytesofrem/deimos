@@ -38,11 +38,12 @@ fn drive<'a>(filename: &'a str, src: &'a str) -> anyhow::Result<()> {
 
     let resolver = Resolver::new("main");
 
-    let mut typecheck = Typechecker::new(resolver);
+    let mut typecheck = Typechecker::new(filename, resolver);
+
     match typecheck.check(&ast) {
         Ok(tast) => {
             println!("Typechecking successful.");
-            //println!("{:#?}", tast)
+            println!("{:#?}", tast)
         }
         Err(e) => {
             print_errors(&e);

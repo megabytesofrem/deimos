@@ -137,6 +137,7 @@ impl<'p> Parser<'p> {
                     comments.push((location, token.literal.to_string()));
                 }
                 TokenKind::KwFunction
+                | TokenKind::KwImport
                 | TokenKind::KwStruct
                 | TokenKind::KwEnum
                 | TokenKind::KwExtern => {

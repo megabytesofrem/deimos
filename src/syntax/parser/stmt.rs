@@ -316,7 +316,7 @@ impl<'p> Parser<'p> {
     pub(crate) fn parse_toplevel_stmt(&mut self) -> parser::Return<ToplevelStmt> {
         let result = match self.peek() {
             Some(token) => match token.kind {
-                //TokenKind::KwImport => self.parse_import(),
+                TokenKind::KwImport => self.parse_import(),
                 TokenKind::KwStruct => self.parse_struct_declare(),
                 TokenKind::KwEnum => self.parse_enum_declare(),
                 TokenKind::KwFunction => self.parse_function_declare(),
@@ -326,6 +326,7 @@ impl<'p> Parser<'p> {
                 _ => Err(SyntaxError::UnexpectedToken {
                     token: token.kind.clone(),
                     expected_any: vec![
+                        TokenKind::KwImport,
                         TokenKind::KwStruct,
                         TokenKind::KwEnum,
                         TokenKind::KwFunction,
@@ -344,7 +345,95 @@ impl<'p> Parser<'p> {
         result
     }
 
+    fn parse_dotted_path(&mut self) -> parser::Return<Vec<String>> {
+        // Collected sum of parts
+        let mut parts = Vec::new();
+
+        // HACK: Store the error outside so we can return it since the inner `match`
+        // can't return a value directly or it would exit the loop
+        //
+        // We still need to store the error, hence this
+        let mut error: Option<SyntaxError> = None;
+
+        // TODO: Clean this up
+        while let Some(token) = self.peek() {
+            match token.kind {
+                TokenKind::Name => {
+                    parts.push(token.literal.to_string());
+
+                    // Consume the token
+                    self.advance();
+                }
+
+                TokenKind::Dot => {
+                    // Consume the dot
+                    self.advance();
+
+                    if let Some(next_token) = self.peek() {
+                        match next_token.kind {
+                            TokenKind::Name => {
+                                // Push the name token after the dot
+                                let name = next_token.literal.to_string();
+                                parts.push(name);
+
+                                // Consume the name token
+                                self.advance();
+                            }
+
+                            _ => {
+                                error = Some(SyntaxError::UnexpectedToken {
+                                    token: next_token.kind.clone(),
+                                    expected_any: vec![TokenKind::Name],
+                                    location: next_token.location.clone(),
+                                });
+
+                                // Consume the unexpected token and break out of the loop
+                                self.advance();
+                                break;
+                            }
+                        }
+                    } else {
+                        return Err(SyntaxError::UnexpectedEof);
+                    }
+                }
+
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        if let Some(err) = error {
+            Err(err)
+        } else {
+            Ok(parts)
+        }
+    }
+
+    fn parse_import(&mut self) -> parser::Return<ToplevelStmt> {
+        // import module.path [as alias]
+        self.expect(TokenKind::KwImport)?;
+        let dotted_path = self.parse_dotted_path()?;
+
+        let mut optional_alias: Option<String> = None;
+
+        if let Some(token) = self.peek() {
+            if token.kind == TokenKind::KwAs {
+                self.advance();
+                let alias = self.expect(TokenKind::Name)?;
+                optional_alias = Some(alias.literal.to_string());
+            }
+        }
+
+        Ok(ToplevelStmt::Import {
+            path: dotted_path,
+            alias: optional_alias,
+        })
+    }
+
     fn parse_extern_declare(&mut self) -> parser::Return<ToplevelStmt> {
+        // FIXME/TODO: Remove this now we have import
+
         // External functions imported from C
         //
         // Expect these to be replaced with modules which support namespacing _very_ soon

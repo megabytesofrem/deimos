@@ -83,6 +83,8 @@ pub enum TokenKind {
     Arrow,
 
     // Keywords
+    #[token("as")]
+    KwAs,
     #[token("public")]
     KwPublic,
     #[token("let")]
