@@ -300,7 +300,7 @@ impl<'t> Typechecker {
 
         self.resolver
             .borrow_mut()
-            .insert_name(name, Ty::Function(Box::new(function_info)))?;
+            .insert_modulewide_name(name, Ty::Function(Box::new(function_info)))?;
 
         let body = self.check_block(body)?;
         Ok(TToplevelStmt::FunctionDecl {
@@ -332,7 +332,7 @@ impl<'t> Typechecker {
 
         self.resolver
             .borrow_mut()
-            .insert_name(name, Ty::Struct(structure_info))?;
+            .insert_modulewide_name(name, Ty::Struct(structure_info))?;
 
         Ok(TToplevelStmt::StructDecl {
             name: name.to_string(),
@@ -361,7 +361,7 @@ impl<'t> Typechecker {
 
         self.resolver
             .borrow_mut()
-            .insert_name(name, Ty::Struct(structure_info))?;
+            .insert_modulewide_name(name, Ty::Struct(structure_info))?;
 
         Ok(TToplevelStmt::EnumDecl {
             name: name.to_string(),

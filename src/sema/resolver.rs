@@ -19,6 +19,7 @@ pub struct Resolver {
     //
     // Within the current module, keep track of structs and enums mostly. This does not
     // track local scoped variables.
+    pub module_name: String,
     pub curr_module: Option<ModuleInfo>,
 
     pub imported_modules: HashMap<String, ModuleInfo>,
@@ -33,6 +34,7 @@ pub struct Resolver {
 impl Resolver {
     pub fn new(module_name: &str) -> Self {
         Resolver {
+            module_name: module_name.to_string(),
             curr_module: None,
             imported_modules: HashMap::new(),
 
@@ -59,10 +61,36 @@ impl Resolver {
         self.scopes.pop().expect("Cannot pop the global scope");
     }
 
+    /// Check whether a symbol is declared or not
     pub fn is_declared(&self, name: &str) -> bool {
         self.declared.contains(name)
     }
 
+    /// Insert a symbol module wide, making it visible to the whole module
+    pub fn insert_modulewide_name(&mut self, name: &str, ty: Ty) -> Return<()> {
+        // Initialize the current module if we need to
+        if self.curr_module.is_none() {
+            self.curr_module = Some(ModuleInfo::new(&self.module_name, &self.module_name));
+        }
+
+        if self.declared.contains(name) {
+            return Err(SemanticError::Redefinition {
+                name: name.to_string(),
+                location: SourceLoc::default(),
+            });
+        }
+
+        self.curr_module
+            .as_mut()
+            .unwrap()
+            .exports
+            .insert(name.to_string(), ty);
+
+        self.declared.insert(name.to_string());
+        Ok(())
+    }
+
+    /// Insert a symbol in the current scope, making it visible to all members
     pub fn insert_name(&mut self, name: &str, ty: Ty) -> Return<()> {
         // Each file maps to a module, so we will need to take this into account later
 
@@ -136,13 +164,6 @@ impl Resolver {
 
                     module_info.imports.push(normalized_path);
                 }
-
-                // FIXME: Remove this, just for testing
-                ToplevelStmt::Stmt(stmt) => match stmt.target {
-                    Stmt::Let { name, ty, value } => module_info.insert_type(&name, &Ty::String),
-
-                    _ => todo!(),
-                },
 
                 ToplevelStmt::StructDecl { name, fields } => module_info.insert_type(
                     &name,
