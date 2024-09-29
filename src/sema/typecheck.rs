@@ -300,9 +300,23 @@ impl<'t> Typechecker {
 
         self.resolver
             .borrow_mut()
-            .insert_modulewide_name(name, Ty::Function(Box::new(function_info)))?;
+            .insert_name(name, Ty::Function(Box::new(function_info)))?;
 
+        // Enter a new scope for the function
+        self.resolver.borrow_mut().push_scope();
+
+        for (param_name, param_ty) in params {
+            self.resolver
+                .borrow_mut()
+                .insert_name(param_name, param_ty.clone())?;
+        }
+
+        // Check the function body in the scope
         let body = self.check_block(body)?;
+
+        // Exit the created scope
+        self.resolver.borrow_mut().pop_scope();
+
         Ok(TToplevelStmt::FunctionDecl {
             name: name.to_string(),
             params: params.to_vec(),

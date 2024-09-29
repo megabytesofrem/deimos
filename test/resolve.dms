@@ -1,0 +1,11 @@
+function scoped()
+    let x:i32 = 456
+    return x
+end
+
+let global:i32 = 123
+
+-- not implemented @ typecheck.rs:267:18
+let scoped_x:i32 = scoped()
+
+--let fail:i32 = x
