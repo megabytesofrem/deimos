@@ -380,7 +380,30 @@ impl<'t> Typechecker {
                 .check_stmt(&stmt)
                 .map(TToplevelStmt::Stmt)
                 .map_err(|e| errors.push(e)),
-            ToplevelStmt::Import { path, alias } => Ok(TToplevelStmt::Import { path, alias }),
+            ToplevelStmt::Import { path, alias } => {
+                // Handle the import
+
+                // NOTE: Paths are assumed to be relative
+                let dotted_path = path.join(".");
+                let imported_module = self.resolver.borrow().parse_module(&path.join("/"));
+
+                if !self
+                    .resolver
+                    .borrow()
+                    .imported_modules
+                    .contains_key(&dotted_path)
+                {
+                    self.resolver
+                        .borrow_mut()
+                        .imported_modules
+                        .insert(dotted_path, imported_module);
+                }
+
+                //
+                // NOTE: We need to map it to its node in the `TypedAst`, despite this being a mirror
+                // due to how our typesystem works.
+                Ok(TToplevelStmt::Import { path, alias })
+            }
             ToplevelStmt::StructDecl { name, fields } => self
                 .check_struct_declare(&name, &fields)
                 .map_err(|e| errors.push(e)),

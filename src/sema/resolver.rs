@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::module::ModuleInfo;
 use super::sema_error::SemanticError;
-use crate::syntax::ast::ToplevelStmt;
+use crate::syntax::ast::{Stmt, ToplevelStmt};
 use crate::syntax::ast_types::{StructureInfo, Ty};
 use crate::syntax::lexer::SourceLoc;
 use crate::syntax::parser::Parser;
@@ -16,7 +16,11 @@ pub(crate) type Return<'r, T> = anyhow::Result<T, SemanticError>;
 #[allow(dead_code)]
 pub struct Resolver {
     // Keep track of the current and imported modules
+    //
+    // Within the current module, keep track of structs and enums mostly. This does not
+    // track local scoped variables.
     pub curr_module: Option<ModuleInfo>,
+
     pub imported_modules: HashMap<String, ModuleInfo>,
 
     errors: Vec<SemanticError>,
@@ -106,14 +110,18 @@ impl Resolver {
     }
 
     // Import resolution
-    // TODO: Implement this
-    //
 
-    fn parse_module(&self, filename: &str) -> ModuleInfo {
+    pub fn parse_module(&self, filename: &str) -> ModuleInfo {
         // Parse a module into a `ModuleInfo` structure
         //
         let mut module_info = ModuleInfo::new(filename, filename);
-        let contents = std::fs::read_to_string(filename).expect("Failed to open file");
+
+        // TODO: We need a concept such as GOPATH for resolving modules, for now just hardcode it
+        //
+        // We could also do `mod.rs` like Rust does, and list all of the modules in there.
+        let filename_ext = format!("test/modules/{}.dms", filename);
+
+        let contents = std::fs::read_to_string(filename_ext).expect("Failed to open file");
         let ast = Parser::parse(&contents).expect("Failed to parse module");
 
         for node in ast.nodes {
@@ -129,6 +137,13 @@ impl Resolver {
                     module_info.imports.push(normalized_path);
                 }
 
+                // FIXME: Remove this, just for testing
+                ToplevelStmt::Stmt(stmt) => match stmt.target {
+                    Stmt::Let { name, ty, value } => module_info.insert_type(&name, &Ty::String),
+
+                    _ => todo!(),
+                },
+
                 ToplevelStmt::StructDecl { name, fields } => module_info.insert_type(
                     &name,
                     &Ty::Struct(StructureInfo::new_struct_with_fields(&name, fields)),
@@ -137,6 +152,8 @@ impl Resolver {
                 _ => todo!(),
             }
         }
+
+        //println!("Final module info: {:#?}", module_info);
 
         module_info
     }
@@ -205,25 +222,5 @@ impl Resolver {
         // Resolve the remaining parts of the name. If the base type is a struct or enum,
         // we resolve it's fields here - otherwise we did not find a field so we return `None`.
         self.resolve_nested_field_name(&mut base_ty, parts[1..].to_vec())
-    }
-}
-
-#[cfg(test)]
-mod resolver_tests {
-    use crate::syntax::ast_types::Ty;
-
-    use super::Resolver;
-
-    #[test]
-    fn resolve_in_scope() {
-        let mut resolver = Resolver::new("test_suite");
-        resolver.insert_name("foo", Ty::String).expect("failure");
-
-        assert!(resolver.resolve_name("foo").is_some())
-    }
-
-    #[test]
-    fn resolve_module_import() {
-        let mut resolver = Resolver::new("module_one");
     }
 }

@@ -3,7 +3,7 @@ use crate::syntax::ast::{Literal, Member, Stmt};
 use crate::syntax::ast_types::{SizedNumber, Ty};
 use crate::syntax::{ast::Expr, lexer::Op, parser::Parser};
 
-fn parser(src: &str) -> Parser {
+pub(crate) fn parser(src: &str) -> Parser {
     Parser::new(crate::syntax::lexer::lex_tokens(src))
 }
 
