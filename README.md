@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="art/logo.png" width="100"/>
+    <img src="art/logo.png" width="80"/>
     <h1 align="center"><b>Deimos</b></h1>
 </p>
 
