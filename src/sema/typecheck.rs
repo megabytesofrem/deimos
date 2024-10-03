@@ -31,14 +31,16 @@ pub struct Typechecker {
     // The substitution environment represents a mapping of type variables and concrete types.
     pub subst: RefCell<SubstitutionEnv>,
 
+    inner_function_body: Option<FunctionInfo>,
     errors: Vec<SemanticError>,
 }
 
 impl<'t> Typechecker {
-    pub fn new(filename: &str, resolver: Resolver) -> Self {
+    pub fn new(_filename: &str, resolver: Resolver) -> Self {
         Self {
             resolver: Rc::new(RefCell::new(resolver.clone())),
             subst: RefCell::new(SubstitutionEnv::new()),
+            inner_function_body: None,
             errors: Vec::new(),
         }
     }
@@ -264,7 +266,13 @@ impl<'t> Typechecker {
 
                 Ok(TStmt::While { cond, body })
             }
-            _ => unimplemented!(),
+
+            Stmt::Return(value) => {
+                // Check the return value of the function
+                let return_value = self.check_return_value(value, &stmt.location)?;
+                Ok(TStmt::Return(return_value))
+            }
+            kind => unimplemented!("{:#?}", kind),
         })
     }
 
@@ -275,6 +283,42 @@ impl<'t> Typechecker {
             .collect::<Return<Vec<Spanned<TStmt>>>>()?;
 
         Ok(block)
+    }
+
+    fn check_return_value(
+        &mut self,
+        return_value: Option<Spanned<Expr>>,
+        location: &SourceLoc,
+    ) -> Return<Option<Spanned<TExpr>>> {
+        let inner_function_body = self.inner_function_body.clone();
+
+        if let Some(inner_function_body) = inner_function_body {
+            // Check the return value matches the functions return type
+
+            let return_expr = match return_value {
+                Some(return_value) => {
+                    let inferred_return_ty = self.infer_expr(&return_value)?;
+
+                    if inferred_return_ty == inner_function_body.return_ty {
+                        Ok(Some(self.check_expr(&return_value)?))
+                    } else {
+                        // Return type does not match the expected return type
+                        Err(SemanticError::TypeMismatch {
+                            expected: inner_function_body.return_ty,
+                            found: inferred_return_ty,
+                            location: location.clone(),
+                        })
+                    }
+                }
+
+                None => Ok(None),
+            };
+
+            return_expr
+        } else {
+            // Return outside of function, this is invalid
+            Ok(None)
+        }
     }
 
     fn check_function_declare(
@@ -300,10 +344,11 @@ impl<'t> Typechecker {
 
         self.resolver
             .borrow_mut()
-            .insert_name(name, Ty::Function(Box::new(function_info)))?;
+            .insert_name(name, Ty::Function(Box::new(function_info.clone())))?;
 
         // Enter a new scope for the function
         self.resolver.borrow_mut().push_scope();
+        self.inner_function_body = Some(function_info);
 
         for (param_name, param_ty) in params {
             self.resolver
@@ -316,6 +361,7 @@ impl<'t> Typechecker {
 
         // Exit the created scope
         self.resolver.borrow_mut().pop_scope();
+        self.inner_function_body = None;
 
         Ok(TToplevelStmt::FunctionDecl {
             name: name.to_string(),
@@ -400,6 +446,8 @@ impl<'t> Typechecker {
                 // NOTE: Paths are assumed to be relative
                 let dotted_path = path.join(".");
                 let imported_module = self.resolver.borrow().parse_module(&path.join("/"));
+
+                println!("Imported: {:#?}", imported_module);
 
                 if !self
                     .resolver

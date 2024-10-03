@@ -37,6 +37,9 @@ pub enum SemanticError {
         location: SourceLoc,
     },
 
+    #[error("{location} Return outside of function")]
+    ReturnOutsideOfFunction { location: SourceLoc },
+
     #[error("{location} Invalid cast from '{from:?}' to '{to:?}'")]
     CannotCast {
         from: Ty,

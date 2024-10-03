@@ -1,4 +1,4 @@
---import module_b as foobar
+import module_b as foobar
 
 struct Foo
 
